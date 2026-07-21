@@ -1,0 +1,20 @@
+{
+  "variables": {
+    "DESCRIPTION": "A Swift command line tool",
+    "EXECUTABLE_NAME": "swift-s3-gateway",
+    "GITHUB_REPOSITORY": "user/repo",
+    "HOMEBREW_CASK_TOKEN": "swift-s3-gateway",
+    "HOMEBREW_FORMULA_CLASS": "App",
+    "HOMEBREW_TAP": "user/tap",
+    "HOMEBREW_TAP_DIR": "../homebrew-tap",
+    "HOMEPAGE": "https://github.com/user/repo",
+    "LICENSE": "MIT",
+    "MACOS_VERSION": "v14",
+    "PROJECT_NAME": "swift-s3-gateway",
+    "SWIFT_COMMAND_TYPE": "AppCommand",
+    "SWIFT_EXECUTABLE_TARGET": "AppCLI",
+    "SWIFT_LIBRARY_TARGET": "AppCore",
+    "SWIFT_TOOLS_VERSION": "6.0",
+    "VERSION": "0.1.0"
+  }
+}

@@ -1,0 +1,43 @@
+name: Linux amd64 build
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-amd64-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build swift-s3-gateway on Linux amd64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Build Release CLI In Swift amd64 Container
+        env:
+          SWIFT_IMAGE: swift@sha256:4c6af6663ed2316002a3b38ff5505a1fc1f2749ec31e84936c32dd336713c569
+          EXECUTABLE_NAME: "swift-s3-gateway"
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --platform linux/amd64 \
+            -e EXECUTABLE_NAME \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$SWIFT_IMAGE" \
+            bash -lc '
+              set -euo pipefail
+              test "$(uname -m)" = "x86_64"
+              swift --version
+              swift build -c release --product "$EXECUTABLE_NAME" --triple x86_64-unknown-linux-gnu
+            '

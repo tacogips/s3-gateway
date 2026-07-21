@@ -1,0 +1,84 @@
+version: "3"
+
+vars:
+  PROJECT_NAME: swift-s3-gateway
+  EXECUTABLE_NAME: swift-s3-gateway
+  TAP_DIR: ../homebrew-tap
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the Swift package
+    cmds:
+      - swift build
+
+  run:
+    desc: Run the executable
+    cmds:
+      - swift run {{.EXECUTABLE_NAME}} {{.CLI_ARGS}}
+
+  test:
+    desc: Run Swift tests
+    cmds:
+      - swift test
+
+  clean:
+    desc: Clean SwiftPM and release artifacts
+    cmds:
+      - rm -rf .build dist release
+
+  lint:
+    desc: Run SwiftLint when available
+    cmds:
+      - swiftlint
+
+  build:homebrew:
+    desc: Build standalone Homebrew formula archives for the current platform, or pass targets after --
+    cmds:
+      - scripts/build-homebrew-release.sh {{.CLI_ARGS}}
+
+  homebrew:formula:
+    desc: Render Formula/swift-s3-gateway.rb from dist/homebrew checksums
+    cmds:
+      - scripts/render-homebrew-formula.sh {{.CLI_ARGS}}
+
+  homebrew:tap-formula:
+    desc: Render the formula into the default sibling Homebrew tap checkout
+    cmds:
+      - |
+        set -euo pipefail
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "usage: task homebrew:tap-formula -- <version>" >&2
+          exit 2
+        fi
+        scripts/render-homebrew-formula.sh "{{.CLI_ARGS}}" "{{.TAP_DIR}}/Formula/swift-s3-gateway.rb"
+
+  build:homebrew-cask:
+    desc: Build signed and notarized Homebrew Cask DMGs, or pass targets after --
+    cmds:
+      - scripts/build-homebrew-cask-release.sh {{.CLI_ARGS}}
+
+  homebrew:cask:
+    desc: Render Casks/swift-s3-gateway.rb from dist/homebrew-cask checksums
+    cmds:
+      - scripts/render-homebrew-cask.sh {{.CLI_ARGS}}
+
+  homebrew:tap-cask:
+    desc: Render the cask into the default sibling Homebrew tap checkout
+    cmds:
+      - |
+        set -euo pipefail
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "usage: task homebrew:tap-cask -- <version>" >&2
+          exit 2
+        fi
+        scripts/render-homebrew-cask.sh "{{.CLI_ARGS}}" "{{.TAP_DIR}}/Casks/swift-s3-gateway.rb"
+
+  release:homebrew-cask-local:
+    desc: Build, notarize, upload, and render the sibling tap cask for a v<version> tag
+    cmds:
+      - scripts/release-homebrew-cask-local.sh {{.CLI_ARGS}}
