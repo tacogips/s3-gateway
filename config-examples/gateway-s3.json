@@ -1,0 +1,61 @@
+{
+  "listener": {
+    "host": "0.0.0.0",
+    "port": 8443,
+    "tls": {
+      "certificateChainPath": "/etc/swift-s3-gateway/tls/certificate.pem",
+      "privateKeyPath": "/etc/swift-s3-gateway/tls/private-key.pem"
+    },
+    "developmentPlaintext": false,
+    "trustedProxyAddresses": []
+  },
+  "limits": {
+    "maximumHeaderBytes": 32768,
+    "maximumXMLBytes": 1048576,
+    "maximumObjectBytes": 5368709120,
+    "maximumChunkBytes": 65536,
+    "maximumInFlightBytes": 8388608,
+    "maximumConcurrentRequests": 256,
+    "requestTimeoutSeconds": 300
+  },
+  "addressingStyles": ["path"],
+  "virtualHostSuffixes": [],
+  "acceptedSigV4Regions": ["us-east-1"],
+  "health": {
+    "livenessPath": "/.well-known/swift-s3-gateway/live",
+    "readinessPath": "/.well-known/swift-s3-gateway/ready"
+  },
+  "telemetry": {
+    "enabled": true
+  },
+  "credentials": {
+    "inboundPath": "/etc/swift-s3-gateway/inbound.json",
+    "upstreamPath": "/etc/swift-s3-gateway/upstream.json",
+    "paginationPath": "/etc/swift-s3-gateway/pagination.json"
+  },
+  "authorization": [
+    {
+      "principalID": "gateway-client",
+      "grants": [
+        {
+          "operations": ["getObject", "headObject", "putObject", "deleteObject", "listObjectsV2"],
+          "bucket": "public-files",
+          "keyPrefix": null
+        }
+      ]
+    }
+  ],
+  "backend": {
+    "kind": "s3",
+    "s3": {
+      "endpoint": "https://s3.us-east-1.amazonaws.com",
+      "region": "us-east-1",
+      "addressingStyle": "path",
+      "bucketMappings": {
+        "public-files": "company-public-files"
+      },
+      "stagingDirectory": "/var/lib/swift-s3-gateway/staging",
+      "trustedCAPath": null
+    }
+  }
+}

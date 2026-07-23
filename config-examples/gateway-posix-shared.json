@@ -1,0 +1,60 @@
+{
+  "listener": {
+    "host": "0.0.0.0",
+    "port": 8443,
+    "tls": {
+      "certificateChainPath": "/etc/swift-s3-gateway/tls/certificate.pem",
+      "privateKeyPath": "/etc/swift-s3-gateway/tls/private-key.pem"
+    },
+    "developmentPlaintext": false,
+    "trustedProxyAddresses": []
+  },
+  "limits": {
+    "maximumHeaderBytes": 32768,
+    "maximumXMLBytes": 1048576,
+    "maximumObjectBytes": 5368709120,
+    "maximumChunkBytes": 65536,
+    "maximumInFlightBytes": 8388608,
+    "maximumConcurrentRequests": 256,
+    "requestTimeoutSeconds": 300
+  },
+  "addressingStyles": ["path"],
+  "virtualHostSuffixes": [],
+  "acceptedSigV4Regions": ["us-east-1"],
+  "health": {
+    "livenessPath": "/.well-known/swift-s3-gateway/live",
+    "readinessPath": "/.well-known/swift-s3-gateway/ready"
+  },
+  "telemetry": {
+    "enabled": true
+  },
+  "credentials": {
+    "inboundPath": "/etc/swift-s3-gateway/inbound.json",
+    "upstreamPath": "/etc/swift-s3-gateway/upstream.json",
+    "paginationPath": "/etc/swift-s3-gateway/pagination.json"
+  },
+  "authorization": [
+    {
+      "principalID": "local-client",
+      "grants": [
+        {
+          "operations": ["getObject", "headObject", "putObject", "deleteObject", "listObjectsV2"],
+          "bucket": "local-files",
+          "keyPrefix": null
+        }
+      ]
+    }
+  ],
+  "backend": {
+    "kind": "posix",
+    "posix": {
+      "rootPath": "/srv/s3-data",
+      "bucketDirectories": {
+        "local-files": "shared"
+      },
+      "layoutPolicy": "sharedLocalDirectory",
+      "sidecarPath": "/srv/s3-metadata",
+      "durability": "strict"
+    }
+  }
+}

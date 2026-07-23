@@ -1,0 +1,13 @@
+{
+  "target": "swift-s3-gateway-shared",
+  "version": "replace-me",
+  "sourceRevisionOrImageDigest": "replace-me",
+  "storageModel": "direct-local-directory",
+  "filesystem": "replace-me",
+  "hardware": "replace-me",
+  "operatingSystem": "replace-me",
+  "tls": true,
+  "objectSizesBytes": [4096, 67108864],
+  "hyperfineRuns": 10,
+  "notes": ""
+}

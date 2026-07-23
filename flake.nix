@@ -66,6 +66,13 @@
           shellHook = ''
             ${preCommitCheck.shellHook}
 
+            ${lib.optionalString pkgs.stdenv.isDarwin ''
+              export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+              export SDKROOT="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+              export TOOLCHAINS="com.apple.dt.toolchain.XcodeDefault"
+              export PATH="$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin:$PATH"
+            ''}
+
             echo "swift-s3-gateway Swift development environment ready"
             echo "Swift version: $(swift --version 2>/dev/null | head -n 1 || echo 'not available')"
             echo "Task version: $(task --version 2>/dev/null || echo 'not available')"
