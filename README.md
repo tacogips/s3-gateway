@@ -62,7 +62,10 @@ Set `backend.s3.trustedCAPath` to an absolute PEM bundle path when the upstream
 uses a private CA; omitting it uses the platform trust roots. Hostname
 verification remains enabled in both cases.
 
-Configured health routes are unauthenticated and return only fixed state.
+Configured health routes are exact-match, unauthenticated control-plane routes
+that return only fixed state. Readiness uses separate capacity from authenticated
+object requests, has a single in-flight probe limit, and inherits the inbound
+request deadline and cancellation.
 Liveness reports that the process is running. Readiness verifies access to the
 configured POSIX roots or performs a signed `HEAD` probe against a mapped
 upstream bucket. Optional telemetry emits one JSON line per request to standard

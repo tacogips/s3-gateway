@@ -39,8 +39,20 @@ import Testing
   )
   let service = try await GatewayService(backend: backend)
   await #expect(throws: BackendError.unavailable(retryable: true)) {
-    try await service.readinessCheck()
+    try await service.readinessCheck(deadline: Date().addingTimeInterval(30))
   }
+}
+
+@Test func gatewayServiceRejectsExpiredReadinessBeforeBackendInvocation() async throws {
+  let backend = CapabilityBackend(
+    supported: [.rangeRead, .conditionalRead, .listPagination, .userMetadata, .checksumSHA256]
+  )
+  let service = try await GatewayService(backend: backend)
+
+  await #expect(throws: BackendError.deadlineExceeded) {
+    try await service.readinessCheck(deadline: Date().addingTimeInterval(-1))
+  }
+  #expect(await backend.readinessInvocations == 0)
 }
 
 @Test func gatewayServiceCancelsBackendWorkAtRequestDeadline() async throws {
@@ -101,6 +113,7 @@ private actor CapabilityBackend: ObjectStoreBackend {
   private let readinessError: BackendError?
   private let putDelay: Duration?
   private let headMetadata: ObjectMetadata?
+  private(set) var readinessInvocations = 0
   private(set) var putInvocations = 0
   private(set) var cancelledPutInvocations = 0
 
@@ -120,7 +133,11 @@ private actor CapabilityBackend: ObjectStoreBackend {
     BackendCapabilities(supported: supported, consistencyDescription: "test")
   }
 
-  func readinessCheck() throws {
+  func readinessCheck(deadline: Date) throws {
+    guard deadline > Date() else {
+      throw BackendError.deadlineExceeded
+    }
+    readinessInvocations += 1
     if let readinessError { throw readinessError }
   }
 

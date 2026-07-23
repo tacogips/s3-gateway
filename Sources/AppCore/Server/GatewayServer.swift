@@ -25,8 +25,13 @@ public actor GatewayServer {
         requestTimeoutSeconds: configuration.limits.requestTimeoutSeconds
       )
     }
-    try await backend.readinessCheck()
+    try await backend.readinessCheck(
+      deadline: Date().addingTimeInterval(
+        TimeInterval(configuration.limits.requestTimeoutSeconds)
+      )
+    )
     let service = try await GatewayService(backend: backend)
+    let healthClassifier = HealthRouteClassifier(configuration: configuration.health)
     let router = S3OperationRouter(
       resolver: S3AddressingResolver(
         styles: configuration.addressingStyles,
@@ -43,13 +48,17 @@ public actor GatewayServer {
       pagination: PaginationTokenService(provider: providers.pagination, maximumLifetime: 900),
       service: service,
       limits: configuration.limits,
-      health: configuration.health,
+      healthClassifier: healthClassifier,
       telemetry: configuration.telemetry?.enabled == true
         ? StandardErrorGatewayTelemetrySink()
         : NoopGatewayTelemetrySink()
     )
     return GatewayServer(
-      transport: NIOHTTPTransport(configuration: configuration.listener, limits: configuration.limits),
+      transport: NIOHTTPTransport(
+        configuration: configuration.listener,
+        limits: configuration.limits,
+        healthClassifier: healthClassifier
+      ),
       application: application
     )
   }

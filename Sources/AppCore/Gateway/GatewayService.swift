@@ -70,8 +70,10 @@ public actor GatewayService {
 
   public func capabilityReport() -> BackendCapabilities { capabilities }
 
-  public func readinessCheck() async throws {
-    try await backend.readinessCheck()
+  public func readinessCheck(deadline: Date) async throws {
+    try await withDeadline(deadline) {
+      try await self.backend.readinessCheck(deadline: deadline)
+    }
   }
 
   private func require(_ capability: BackendCapability) throws {

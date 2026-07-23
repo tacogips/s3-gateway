@@ -58,12 +58,18 @@ public actor S3Backend: ObjectStoreBackend {
     )
   }
 
-  public func readinessCheck() async throws {
+  public func readinessCheck(deadline: Date) async throws {
+    try checkRetryState(deadline: deadline)
     guard let bucketText = configuration.bucketMappings.keys.sorted().first,
           let bucket = BucketName(rawValue: bucketText) else {
       throw BackendError.unavailable(retryable: false)
     }
-    let request = try await signer.signedRequest(method: "HEAD", bucket: bucket, key: nil)
+    let request = try await signer.signedRequest(
+      method: "HEAD",
+      bucket: bucket,
+      key: nil,
+      deadline: deadline
+    )
     let response = try await executeWithRetry(request)
     guard (200...299).contains(response.status) else {
       throw BackendError.unavailable(retryable: response.status == 429 || response.status >= 500)

@@ -1,0 +1,16 @@
+{
+  "target": "versitygw-v1.7.0-posix",
+  "version": "1.7.0",
+  "sourceRevisionOrImageDigest": "8a3dbcf97d996ea4955426e6b8a76eb96d2cd92a",
+  "storageModel": "direct-local-directory",
+  "filesystem": "APFS",
+  "hardware": "Apple M4, 10 CPU cores, 32 GB memory",
+  "operatingSystem": "macOS 26.5, Darwin 25.5.0 arm64",
+  "tls": false,
+  "objectSizesBytes": [4096, 67108864],
+  "hyperfineRuns": 5,
+  "hyperfineWarmup": 1,
+  "concurrency": 2,
+  "awsCliVersion": "2.35.11",
+  "notes": "Official Darwin arm64 release asset. AWS request and response checksum modes were when_required."
+}

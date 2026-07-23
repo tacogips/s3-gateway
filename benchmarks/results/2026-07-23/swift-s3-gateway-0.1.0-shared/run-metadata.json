@@ -1,0 +1,16 @@
+{
+  "target": "swift-s3-gateway-0.1.0-shared",
+  "version": "0.1.0",
+  "sourceRevisionOrImageDigest": "7b530acf3221ebee7e565a5494a7182ff47a21e5",
+  "storageModel": "direct-local-directory",
+  "filesystem": "APFS",
+  "hardware": "Apple M4, 10 CPU cores, 32 GB memory",
+  "operatingSystem": "macOS 26.5, Darwin 25.5.0 arm64",
+  "tls": false,
+  "objectSizesBytes": [4096, 67108864],
+  "hyperfineRuns": 5,
+  "hyperfineWarmup": 1,
+  "concurrency": 2,
+  "awsCliVersion": "2.35.11",
+  "notes": "Release build; AWS request and response checksum modes were when_required. The source revision is the committed Stage 1 baseline."
+}

@@ -43,7 +43,7 @@ trap cleanup EXIT
   echo "s3_endpoint=$S3_ENDPOINT"
   echo "aws_cli=$(aws --version 2>&1)"
   echo "hyperfine=$(hyperfine --version 2>&1)"
-  echo "operating_system=$(uname -a)"
+  echo "operating_system=$(uname -srm)"
   echo "benchmark_runs=$benchmark_runs"
   echo "benchmark_warmup=$benchmark_warmup"
   echo "benchmark_concurrency=$benchmark_concurrency"

@@ -1,0 +1,8 @@
+target_label=versitygw-v1.7.0-posix
+s3_endpoint=http://127.0.0.1:19000
+aws_cli=aws-cli/2.35.11 Python/3.14.6 Darwin/25.5.0 source/arm64
+hyperfine=hyperfine 1.20.0
+operating_system=Darwin 25.5.0 arm64
+benchmark_runs=5
+benchmark_warmup=1
+benchmark_concurrency=2

@@ -1,0 +1,16 @@
+{
+  "target": "seaweedfs-4.40-mini-filer",
+  "version": "4.40",
+  "sourceRevisionOrImageDigest": "875cd1f67ea25e8965a4f5ba1e6aaf501ba6b6fa",
+  "storageModel": "filer-backed-managed-namespace",
+  "filesystem": "APFS",
+  "hardware": "Apple M4, 10 CPU cores, 32 GB memory",
+  "operatingSystem": "macOS 26.5, Darwin 25.5.0 arm64",
+  "tls": false,
+  "objectSizesBytes": [4096, 67108864],
+  "hyperfineRuns": 5,
+  "hyperfineWarmup": 1,
+  "concurrency": 2,
+  "awsCliVersion": "2.35.11",
+  "notes": "Official Darwin arm64 release asset in mini mode. Peak RSS is for the all-in-one process. AWS request and response checksum modes were when_required."
+}

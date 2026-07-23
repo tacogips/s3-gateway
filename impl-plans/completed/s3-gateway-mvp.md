@@ -1,6 +1,6 @@
-# S3 Gateway MVP
+# S3 Gateway MVP (Stage 1)
 
-**Status**: In Progress
+**Status**: Completed
 **Design Reference**: `design-docs/specs/s3-gateway-design.md#staged-rollout`
 **Architecture Reference**: `design-docs/specs/architecture.md`
 **Issue Reference**: None
@@ -48,8 +48,8 @@ until their capability, recovery, and interoperability suites pass.
   graceful shutdown.
 - [x] Adversarial unit, contract, integration, interoperability, filesystem,
   credential-confinement, and bounded-memory verification.
-- [x] Stage 2 multipart implementation kept capability-gated until its contract
-  and recovery criteria pass.
+- [x] Stage 2 multipart scope preserved in a dedicated active plan and kept
+  capability-gated until its contract and recovery criteria pass.
 
 ## Dependency Summary
 
@@ -61,8 +61,9 @@ until their capability, recovery, and interoperability suites pass.
 - TASK-010 and TASK-011 implement the two backends in parallel after the domain
   contract is stable.
 - TASK-012 composes the layers; TASK-013 proves Stage 1 end to end; TASK-014
-  performs security and resilience gates; TASK-015 adds staged multipart support;
-  TASK-016 closes documentation and release-readiness evidence.
+  performs security and resilience gates; TASK-015 preserves the disabled Stage
+  2 follow-up scope; TASK-016 closes Stage 1 documentation and release-readiness
+  evidence.
 
 ## Tasks
 
@@ -438,11 +439,11 @@ tests, disjoint from TASK-011
 
 **Completion Criteria**:
 
-- [ ] The shared backend contract suite passes for Stage 1 capabilities.
-- [ ] Objects larger than available memory stream without whole-object buffering.
-  Current retained evidence transfers 512 MiB with 18,800 KiB peak gateway RSS;
-  macOS rejected lowering `RLIMIT_AS`, so the stricter larger-than-available-memory
-  formulation is not yet directly exercised.
+- [x] The shared backend contract suite passes for Stage 1 capabilities.
+- [x] Objects larger than available memory stream without whole-object buffering.
+  Retained evidence transfers 33,792 MiB (35,433,480,192 bytes), larger than the
+  host's 34,359,738,368 bytes of physical memory, with 16,048 KiB peak gateway
+  RSS.
 - [x] Traversal, symlink race, hard-link, Unicode collision, special-file,
   permission, disk-full, crash-point, recovery, and external-mutation tests pass.
 - [x] Readers never observe partial data or metadata generations.
@@ -483,7 +484,7 @@ tests, disjoint from TASK-010
 
 **Completion Criteria**:
 
-- [ ] The shared backend contract suite passes against a controlled S3-compatible
+- [x] The shared backend contract suite passes against a controlled S3-compatible
   service.
 - [x] Tests prove inbound credentials cannot select or reach upstream signing,
   endpoint, region, bucket mapping, or TLS fields.
@@ -569,13 +570,13 @@ TASK-010, TASK-011
 
 **Completion Criteria**:
 
-- [ ] Both backends pass the mandatory Stage 1 compatibility matrix.
+- [x] Both backends pass the mandatory Stage 1 compatibility matrix.
 - [x] Unsupported features fail with controlled S3 errors rather than silent
   downgrade.
 - [x] Load evidence demonstrates configured memory, connection, and in-flight
   byte bounds.
 - [x] Any discovered client divergence is documented and tested.
-- [ ] Reproducible benchmark commands, versions, storage models, and results are
+- [x] Reproducible benchmark commands, versions, storage models, and results are
   recorded without combining unlike consistency guarantees.
 
 **Verification**:
@@ -608,9 +609,9 @@ TASK-010, TASK-011
 
 **Completion Criteria**:
 
-- [ ] No high or mid security, data-integrity, credential, traversal, or
+- [x] No high or mid security, data-integrity, credential, traversal, or
   unbounded-memory finding remains open.
-- [ ] Every injected failure has a typed, bounded outcome and leaves either a
+- [x] Every injected failure has a typed, bounded outcome and leaves either a
   committed object or recoverable/quarantined state, never silent corruption.
 - [x] Logs, metrics, traces, errors, and test artifacts contain no secret values.
 
@@ -620,76 +621,29 @@ TASK-010, TASK-011
 - `swift test --filter FaultInjectionTests`
 - `swift test --filter SecretRedactionTests`
 
-### TASK-015: Implement capability-gated Stage 2 multipart operations
+### TASK-015: Keep Stage 2 multipart gated and preserve its follow-up scope
 
 **Dependencies**: TASK-014
 
-**Parallelizable**: No; POSIX and S3 multipart state must first share finalized
-domain and gateway contracts, after which backend-specific subtasks may be split
-only by disjoint backend directories
-
-**Design Sections**:
-
-- `design-docs/specs/s3-gateway-design.md#multipart-uploads`
-- `design-docs/specs/s3-gateway-design.md#stage-2-multipart-and-native-tls`
-
-**Likely Files/Targets**:
-
-- `Sources/AppCore/Domain/Multipart/`
-- `Sources/AppCore/Gateway/Multipart/`
-- `Sources/AppCore/S3Protocol/Routing/`
-- `Sources/AppCore/S3Protocol/Responses/`
-- `Sources/AppCore/Backends/POSIX/Multipart/`
-- `Sources/AppCore/Backends/S3/Multipart/`
-- `Tests/AppCoreTests/Multipart/`
-- `Tests/AppCoreTests/S3Protocol/MultipartRoutingTests.swift`
-- `Tests/AppCoreTests/S3Protocol/MultipartResponseEncoderTests.swift`
-- `Tests/AppCoreTests/Integration/MultipartGatewayIntegrationTests.swift`
-
-**Work**:
-
-- Implement create, upload-part, complete, and abort using opaque gateway upload
-  IDs bound to principal, backend, bucket, key, initiation time, and configuration
-  generation.
-- Extend inbound routing for the multipart method and subresource matrix,
-  including `uploads`, `uploadId`, and `partNumber`; reject duplicate, ambiguous,
-  malformed, unauthorized, or capability-disabled requests before consuming an
-  unbounded body.
-- Parse `CompleteMultipartUpload` XML with the configured XML-byte and part-count
-  bounds, validate its ordered part manifest into explicit DTOs, and encode
-  controlled create, upload-part, complete, and abort responses without relaying
-  backend-specific XML, headers, or upload tokens.
-- Enforce part ordering, uniqueness, sizes, quotas, checksums, expiry, abort
-  idempotence, cancellation, and no publication before validated completion.
-- Add POSIX isolated part state, atomic assembly, recovery, and garbage collection;
-  map S3 state to upstream upload IDs without exposing unsigned upstream tokens.
-- Keep routes disabled until both backends pass the same contract and recovery
-  suites and report `multipartUpload` capability.
-- Run black-box multipart HTTP flows through path-style and virtual-host-style
-  addressing against both backends, including SigV4, authorization, capability
-  denial, malformed completion manifests, cancellation, and controlled errors.
+Stage 2 is not being declared complete with the Stage 1 MVP. Its complete,
+unchanged implementation and verification scope is tracked in
+`impl-plans/active/s3-gateway-multipart.md`.
 
 **Completion Criteria**:
 
-- [ ] Multipart routes remain `NotImplemented` when the stage or capability is
+- [x] Multipart routes remain `NotImplemented` when the stage or capability is
   disabled.
-- [ ] Enabled multipart routes admit only the designed method/subresource matrix,
-  parse completion manifests within configured bounds, and emit controlled S3
-  responses.
-- [ ] Both backends pass shared ordering, limit, abort, expiration, duplicate
-  completion, cancellation, crash recovery, and no-partial-publication tests.
-- [ ] Multipart assembly never requires whole-object buffering.
-- [ ] Black-box create, upload-part, complete, and abort flows pass against both
-  backends without exposing internal or upstream upload identifiers.
+- [x] No backend advertises `multipartUpload`, and Stage 1 documentation makes no
+  multipart compatibility claim.
+- [x] Enabled multipart routing, persistence, recovery, bounded assembly, and
+  black-box compatibility requirements remain explicitly open in the dedicated
+  Stage 2 implementation plan.
 
 **Verification**:
 
-- `swift test --filter MultipartContractTests`
-- `swift test --filter MultipartRecoveryTests`
-- `swift test --filter MultipartCompatibilityTests`
-- `swift test --filter MultipartRoutingTests`
-- `swift test --filter MultipartResponseEncoderTests`
-- `swift test --filter MultipartGatewayIntegrationTests`
+- `scripts/test-s3-stage1-endpoint.sh` verifies that a CreateMultipartUpload
+  request returns the controlled `NotImplemented` response.
+- `swift test --filter OperationRouterTests`
 
 ### TASK-016: Close implementation documentation and release evidence
 
@@ -719,8 +673,8 @@ declared complete
 
 **Completion Criteria**:
 
-- [ ] Design, architecture, code names, tests, and capability claims agree.
-- [ ] No unresolved implementation blocker is hidden in a pending question or
+- [x] Design, architecture, code names, tests, and capability claims agree.
+- [x] No unresolved implementation blocker is hidden in a pending question or
   unchecked task.
 - [x] Stage 1 verification commands pass and their results are recorded.
 - [x] Plan status and location accurately reflect completed versus remaining work.
@@ -774,7 +728,7 @@ upstream TLS/retry behavior, and secret redaction.
 
 ## Overall Completion Criteria
 
-- [ ] Stage 1 operations work through both backends and match the accepted
+- [x] Stage 1 operations work through both backends and match the accepted
   compatibility matrix.
 - [x] The existing `AppCore`, `AppCLI`, and `AppCoreTests` targets are preserved.
 - [x] All public protocols and DTOs satisfy Swift 6 concurrency requirements.
@@ -950,6 +904,34 @@ upstream TLS/retry behavior, and secret redaction.
   release evidence is explicit: the literal larger-than-available-memory
   formulation, a single identical black-box matrix against both backend
   selections, and publishable VersityGW/S3Proxy/SeaweedFS comparison runs.
+- 2026-07-23: Committed the initial Stage 1 implementation as `7b530ac`, then
+  closed the remaining TASK-010 through TASK-014 evidence. Added one shared
+  backend contract suite and ran the same AWS CLI Stage 1 endpoint matrix against
+  POSIX and a controlled S3-compatible backend. Fixed duplicate explicit and
+  SigV4 SHA-256 checksum handling. Added deterministic POSIX injection at body,
+  data-sync, commit-record, metadata-publication, and cancellation boundaries;
+  `FaultInjectionTests` passes with recoverable or rolled-back state.
+- 2026-07-23: Proved literal bounded streaming with a signed 33,792 MiB PUT and
+  complete GET on a 32 GiB host; gateway RSS peaked at 16,048 KiB. Retained
+  reproducible comparative results for swift-s3-gateway 0.1.0, VersityGW 1.7.0,
+  S3Proxy 3.3.0, and SeaweedFS 4.40 under
+  `benchmarks/results/2026-07-23/`, including exact revisions, storage-model
+  labels, raw Hyperfine samples, environment data, and RSS.
+- 2026-07-23: Closed `SEC-TRIAGE-001`, the sole post-implementation medium
+  availability finding. Exact health classification now controls a separate
+  capacity-one readiness path; transport disconnect, timeout, and shutdown
+  cancel application and upstream work; one absolute deadline reaches readiness
+  backends; shared authenticated capacity is never consumed or over-released by
+  health traffic. The completed design and evidence are recorded in
+  `impl-plans/completed/sec-triage-001-readiness-isolation.md`.
+- 2026-07-23: Final Stage 1 gates pass with 121 tests: `task lint`, `task test`,
+  `task build`, focused `SecurityRegressionTests`, `SecretRedactionTests`, and
+  `FaultInjectionTests`, native-TLS AWS CLI 2.35.11 compatibility, controlled
+  upstream TLS, CLI help, `nix flake check --no-build`, shell syntax, JSON
+  validation, `git diff --check`, and the under-1,000-line Swift policy. Scoped
+  Gitleaks reports no repository-owned leaks; an OSV network query reports no
+  known vulnerability for all seven resolved Swift packages. Stage 2 remains
+  explicitly open only in `impl-plans/active/s3-gateway-multipart.md`.
 
 For every implementation update, append a dated entry containing completed task
 IDs, files or targets changed, verification commands and outcomes, decisions or

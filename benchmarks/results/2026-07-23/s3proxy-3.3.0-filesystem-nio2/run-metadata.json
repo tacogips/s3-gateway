@@ -1,0 +1,16 @@
+{
+  "target": "s3proxy-3.3.0-filesystem-nio2",
+  "version": "3.3.0",
+  "sourceRevisionOrImageDigest": "3390164beee7670c27489e76c3b682be5d660a2a",
+  "storageModel": "filesystem-nio2-managed-namespace",
+  "filesystem": "APFS",
+  "hardware": "Apple M4, 10 CPU cores, 32 GB memory",
+  "operatingSystem": "macOS 26.5, Darwin 25.5.0 arm64",
+  "tls": false,
+  "objectSizesBytes": [4096, 67108864],
+  "hyperfineRuns": 5,
+  "hyperfineWarmup": 1,
+  "concurrency": 2,
+  "awsCliVersion": "2.35.11",
+  "notes": "Official executable JAR on OpenJDK 21. Peak RSS includes the JVM. AWS request and response checksum modes were when_required."
+}

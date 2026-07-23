@@ -663,7 +663,7 @@ import Testing
     withDestinationURL: moved
   )
   await #expect(throws: BackendError.unavailable(retryable: true)) {
-    try await backend.readinessCheck()
+    try await backend.readinessCheck(deadline: Date().addingTimeInterval(30))
   }
 }
 

@@ -7,6 +7,8 @@ public struct HTTPTransportRequest: Sendable {
   public let headers: [String: [String]]
   public let body: ObjectBodyStream
   public let remoteAddress: String?
+  public let healthAdmission: HealthAdmission
+  public let deadline: Date
 
   public init(
     method: String,
@@ -14,7 +16,11 @@ public struct HTTPTransportRequest: Sendable {
     rawQuery: String,
     headers: [String: [String]],
     body: ObjectBodyStream,
-    remoteAddress: String? = nil
+    remoteAddress: String? = nil,
+    healthClassifier: HealthRouteClassifier = .disabled,
+    deadline: Date = Date().addingTimeInterval(
+      TimeInterval(GatewayLimits.defaults.requestTimeoutSeconds)
+    )
   ) {
     self.method = method
     self.rawPath = rawPath
@@ -22,6 +28,12 @@ public struct HTTPTransportRequest: Sendable {
     self.headers = headers
     self.body = body
     self.remoteAddress = remoteAddress
+    healthAdmission = healthClassifier.classify(
+      method: method,
+      rawPath: rawPath,
+      rawQuery: rawQuery
+    )
+    self.deadline = deadline
   }
 
   public func header(_ name: String) -> [String] {

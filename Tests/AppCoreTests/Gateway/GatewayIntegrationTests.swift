@@ -23,6 +23,9 @@ import Testing
     )
   )
   let service = try await GatewayService(backend: backend)
+  let healthClassifier = HealthRouteClassifier(
+    configuration: HealthEndpointConfiguration()
+  )
   let principal = PrincipalAuthorization(
     principalID: "client-principal",
     grants: [
@@ -37,7 +40,7 @@ import Testing
     pagination: PaginationTokenService(provider: IntegrationPaginationKeys(), maximumLifetime: 300),
     service: service,
     limits: .defaults,
-    health: HealthEndpointConfiguration(),
+    healthClassifier: healthClassifier,
     telemetry: telemetry
   )
   let healthResponse = await application.handle(
@@ -46,7 +49,8 @@ import Testing
       rawPath: "/.well-known/swift-s3-gateway/ready",
       rawQuery: "",
       headers: [:],
-      body: ObjectBodyStream(data: Data())
+      body: ObjectBodyStream(data: Data()),
+      healthClassifier: healthClassifier
     )
   )
   #expect(healthResponse.status == 200)
@@ -75,6 +79,9 @@ import Testing
 
 @Test func readinessRouteReturnsUnavailableWhenBackendProbeFails() async throws {
   let service = try await GatewayService(backend: UnreadyIntegrationBackend())
+  let healthClassifier = HealthRouteClassifier(
+    configuration: HealthEndpointConfiguration()
+  )
   let application = S3GatewayApplication(
     router: S3OperationRouter(resolver: S3AddressingResolver(styles: [.path], virtualHostSuffixes: [])),
     verifier: SigV4Verifier(credentials: IntegrationInboundCredentials(), acceptedRegions: ["us-east-1"]),
@@ -82,7 +89,102 @@ import Testing
     pagination: PaginationTokenService(provider: IntegrationPaginationKeys(), maximumLifetime: 300),
     service: service,
     limits: .defaults,
-    health: HealthEndpointConfiguration()
+    healthClassifier: healthClassifier
+  )
+  let response = await application.handle(
+    HTTPTransportRequest(
+      method: "GET",
+      rawPath: "/.well-known/swift-s3-gateway/ready",
+      rawQuery: "",
+      headers: [:],
+      body: ObjectBodyStream(data: Data()),
+      healthClassifier: healthClassifier
+    )
+  )
+  #expect(response.status == 503)
+  let collector = GatewayDataCollector()
+  try await #require(response.body).consume { await collector.append($0) }
+  #expect(String(data: await collector.data, encoding: .utf8)?.contains("not-ready") == true)
+}
+
+@Test func readinessCancellationReleasesDedicatedAdmissionWithoutAffectingObjectWork() async throws {
+  let backend = BlockingReadinessIntegrationBackend()
+  let service = try await GatewayService(backend: backend)
+  let healthClassifier = HealthRouteClassifier(
+    configuration: HealthEndpointConfiguration()
+  )
+  let application = S3GatewayApplication(
+    router: S3OperationRouter(
+      resolver: S3AddressingResolver(styles: [.path], virtualHostSuffixes: [])
+    ),
+    verifier: SigV4Verifier(
+      credentials: IntegrationInboundCredentials(),
+      acceptedRegions: ["us-east-1"]
+    ),
+    authorization: try AuthorizationPolicy(principals: []),
+    pagination: PaginationTokenService(
+      provider: IntegrationPaginationKeys(),
+      maximumLifetime: 300
+    ),
+    service: service,
+    limits: .defaults,
+    healthClassifier: healthClassifier
+  )
+  let readinessRequest = HTTPTransportRequest(
+    method: "GET",
+    rawPath: "/.well-known/swift-s3-gateway/ready",
+    rawQuery: "",
+    headers: [:],
+    body: ObjectBodyStream(data: Data()),
+    healthClassifier: healthClassifier,
+    deadline: Date().addingTimeInterval(30)
+  )
+  let firstProbe = Task {
+    await application.handle(readinessRequest)
+  }
+  await backend.waitUntilStarted()
+
+  let saturatedResponse = await application.handle(readinessRequest)
+  #expect(saturatedResponse.status == 503)
+  let saturatedBody = GatewayDataCollector()
+  try await #require(saturatedResponse.body).consume {
+    await saturatedBody.append($0)
+  }
+  #expect(await saturatedBody.data == Data("{\"status\":\"not-ready\"}\n".utf8))
+  #expect(await backend.readinessInvocations == 1)
+
+  firstProbe.cancel()
+  #expect(await firstProbe.value.status == 503)
+  await backend.waitUntilCancelled()
+  #expect(await backend.cancelledInvocations == 1)
+
+  let recoveredResponse = await application.handle(readinessRequest)
+  #expect(recoveredResponse.status == 200)
+  #expect(await backend.readinessInvocations == 2)
+}
+
+@Test func forgedHealthAdmissionFailsClosedBeforeBackendOrAuthentication() async throws {
+  let backend = BlockingReadinessIntegrationBackend()
+  let service = try await GatewayService(backend: backend)
+  let healthClassifier = HealthRouteClassifier(
+    configuration: HealthEndpointConfiguration()
+  )
+  let application = S3GatewayApplication(
+    router: S3OperationRouter(
+      resolver: S3AddressingResolver(styles: [.path], virtualHostSuffixes: [])
+    ),
+    verifier: SigV4Verifier(
+      credentials: IntegrationInboundCredentials(),
+      acceptedRegions: ["us-east-1"]
+    ),
+    authorization: try AuthorizationPolicy(principals: []),
+    pagination: PaginationTokenService(
+      provider: IntegrationPaginationKeys(),
+      maximumLifetime: 300
+    ),
+    service: service,
+    limits: .defaults,
+    healthClassifier: healthClassifier
   )
   let response = await application.handle(
     HTTPTransportRequest(
@@ -93,10 +195,10 @@ import Testing
       body: ObjectBodyStream(data: Data())
     )
   )
-  #expect(response.status == 503)
-  let collector = GatewayDataCollector()
-  try await #require(response.body).consume { await collector.append($0) }
-  #expect(String(data: await collector.data, encoding: .utf8)?.contains("not-ready") == true)
+
+  #expect(response.status == 500)
+  #expect(response.body == nil)
+  #expect(await backend.readinessInvocations == 0)
 }
 
 @Test func gatewayFailsClosedWhenBackendListEscapesAuthorizedScope() async throws {
@@ -269,12 +371,78 @@ import Testing
   #expect(await backend.getCount == 0)
 }
 
+@Test func signedPayloadAndExplicitSHA256MergeWithoutDuplicateBackendChecksums() async throws {
+  let backend = ChecksumCaptureIntegrationBackend()
+  let service = try await GatewayService(backend: backend)
+  let application = S3GatewayApplication(
+    router: S3OperationRouter(
+      resolver: S3AddressingResolver(styles: [.path], virtualHostSuffixes: [])
+    ),
+    verifier: SigV4Verifier(
+      credentials: IntegrationInboundCredentials(),
+      acceptedRegions: ["us-east-1"]
+    ),
+    authorization: try AuthorizationPolicy(
+      principals: [
+        PrincipalAuthorization(
+          principalID: "client-principal",
+          grants: [
+            AuthorizationGrant(
+              operations: [.putObject],
+              bucket: "test-bucket"
+            )
+          ]
+        )
+      ]
+    ),
+    pagination: PaginationTokenService(
+      provider: IntegrationPaginationKeys(),
+      maximumLifetime: 300
+    ),
+    service: service,
+    limits: .defaults
+  )
+  let body = Data("checksum-body".utf8)
+  let payloadHash = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
+  let checksum = Data(SHA256.hash(data: body)).base64EncodedString()
+  let request = try signedTransportRequest(
+    method: "PUT",
+    path: "/test-bucket/checksum.bin",
+    body: body,
+    additionalHeaders: [("x-amz-checksum-sha256", checksum)],
+    payloadHash: payloadHash
+  )
+  let response = await application.handle(request)
+  #expect(response.status == 200)
+  #expect(await backend.capturedChecksums == [
+    ObjectChecksum(algorithm: .sha256, base64Value: checksum)
+  ])
+
+  let conflicting = try signedTransportRequest(
+    method: "PUT",
+    path: "/test-bucket/conflicting.bin",
+    body: body,
+    additionalHeaders: [
+      ("x-amz-checksum-sha256", Data(repeating: 7, count: 32).base64EncodedString())
+    ],
+    payloadHash: payloadHash
+  )
+  let conflictingResponse = await application.handle(conflicting)
+  #expect(conflictingResponse.status == 400)
+  let collector = GatewayDataCollector()
+  try await #require(conflictingResponse.body).consume { await collector.append($0) }
+  #expect(String(data: await collector.data, encoding: .utf8)?.contains("BadDigest") == true)
+  #expect(await backend.putCount == 1)
+}
+
 private func signedTransportRequest(
   method: String,
   path: String,
   rawQuery: String = "",
   host: String = "localhost",
-  body: Data
+  body: Data,
+  additionalHeaders: [(String, String)] = [],
+  payloadHash explicitPayloadHash: String? = nil
 ) throws -> HTTPTransportRequest {
   let now = Date()
   let formatter = DateFormatter()
@@ -282,13 +450,17 @@ private func signedTransportRequest(
   formatter.timeZone = TimeZone(secondsFromGMT: 0)
   formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
   let date = formatter.string(from: now)
-  let payloadHash = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
+  let payloadHash = explicitPayloadHash ??
+    SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
   var headers: [String: [String]] = [
     "host": [host],
     "x-amz-content-sha256": [payloadHash],
     "x-amz-date": [date]
   ]
-  let signedHeaders = ["host", "x-amz-content-sha256", "x-amz-date"]
+  for (name, value) in additionalHeaders {
+    headers[name.lowercased(), default: []].append(value)
+  }
+  let signedHeaders = headers.keys.sorted()
   let canonical = try SigV4Canonicalizer.canonicalRequest(
     request: SigV4Request(
       method: method,
@@ -321,6 +493,73 @@ private func signedTransportRequest(
     headers: headers,
     body: ObjectBodyStream(data: body)
   )
+}
+
+private actor ChecksumCaptureIntegrationBackend: ObjectStoreBackend {
+  nonisolated let kind: BackendKind = .s3
+  private(set) var capturedChecksums: [ObjectChecksum] = []
+  private(set) var putCount = 0
+
+  nonisolated func capabilities() -> BackendCapabilities {
+    BackendCapabilities(
+      supported: [
+        .rangeRead,
+        .conditionalRead,
+        .listPagination,
+        .userMetadata,
+        .checksumSHA256
+      ],
+      consistencyDescription: "test"
+    )
+  }
+
+  func getObject(
+    _ request: GetObjectRequest,
+    context: RequestContext
+  ) async throws -> GetObjectResult {
+    throw BackendError.notFound
+  }
+
+  func headObject(
+    _ request: HeadObjectRequest,
+    context: RequestContext
+  ) async throws -> ObjectMetadata {
+    throw BackendError.notFound
+  }
+
+  func putObject(
+    _ request: PutObjectRequest,
+    context: RequestContext
+  ) async throws -> PutObjectResult {
+    putCount += 1
+    capturedChecksums = request.expectedChecksums
+    guard let entityTag = EntityTag(rawValue: "\"checksum\"") else {
+      throw BackendError.consistencyFailure
+    }
+    return PutObjectResult(
+      metadata: ObjectMetadata(
+        contentType: request.contentType,
+        contentLength: request.knownContentLength ?? 0,
+        lastModified: Date(timeIntervalSince1970: 0),
+        entityTag: entityTag,
+        userMetadata: request.userMetadata,
+        checksums: request.expectedChecksums,
+        versionToken: ObjectVersionToken(rawValue: "checksum")
+      )
+    )
+  }
+
+  func deleteObject(
+    _ request: DeleteObjectRequest,
+    context: RequestContext
+  ) async throws {}
+
+  func listObjectsV2(
+    _ request: ListObjectsV2Request,
+    context: RequestContext
+  ) async throws -> ListObjectsV2Result {
+    ListObjectsV2Result(objects: [], commonPrefixes: [], nextContinuationToken: nil)
+  }
 }
 
 private actor VirtualHostIntegrationBackend: ObjectStoreBackend {
@@ -439,7 +678,10 @@ private struct UnreadyIntegrationBackend: ObjectStoreBackend {
     )
   }
 
-  func readinessCheck() async throws {
+  func readinessCheck(deadline: Date) async throws {
+    guard deadline > Date() else {
+      throw BackendError.deadlineExceeded
+    }
     throw BackendError.unavailable(retryable: true)
   }
 
@@ -462,6 +704,112 @@ private struct UnreadyIntegrationBackend: ObjectStoreBackend {
     context: RequestContext
   ) async throws -> ListObjectsV2Result {
     throw BackendError.unavailable(retryable: true)
+  }
+}
+
+private actor BlockingReadinessIntegrationBackend: ObjectStoreBackend {
+  nonisolated let kind: BackendKind = .posix
+  private(set) var readinessInvocations = 0
+  private(set) var cancelledInvocations = 0
+  private var started = false
+  private var cancelled = false
+  private var startWaiters: [CheckedContinuation<Void, Never>] = []
+  private var cancellationWaiters: [CheckedContinuation<Void, Never>] = []
+
+  nonisolated func capabilities() -> BackendCapabilities {
+    BackendCapabilities(
+      supported: [
+        .rangeRead,
+        .conditionalRead,
+        .listPagination,
+        .userMetadata,
+        .checksumSHA256
+      ],
+      consistencyDescription: "test"
+    )
+  }
+
+  func readinessCheck(deadline: Date) async throws {
+    guard deadline > Date() else {
+      throw BackendError.deadlineExceeded
+    }
+    readinessInvocations += 1
+    guard readinessInvocations == 1 else {
+      return
+    }
+    started = true
+    let startWaiters = self.startWaiters
+    self.startWaiters.removeAll()
+    for waiter in startWaiters {
+      waiter.resume()
+    }
+    do {
+      try await Task.sleep(for: .seconds(30))
+    } catch {
+      cancelledInvocations += 1
+      cancelled = true
+      let cancellationWaiters = self.cancellationWaiters
+      self.cancellationWaiters.removeAll()
+      for waiter in cancellationWaiters {
+        waiter.resume()
+      }
+      throw BackendError.cancelled
+    }
+  }
+
+  func waitUntilStarted() async {
+    guard !started else {
+      return
+    }
+    await withCheckedContinuation {
+      startWaiters.append($0)
+    }
+  }
+
+  func waitUntilCancelled() async {
+    guard !cancelled else {
+      return
+    }
+    await withCheckedContinuation {
+      cancellationWaiters.append($0)
+    }
+  }
+
+  func getObject(
+    _ request: GetObjectRequest,
+    context: RequestContext
+  ) async throws -> GetObjectResult {
+    throw BackendError.notFound
+  }
+
+  func headObject(
+    _ request: HeadObjectRequest,
+    context: RequestContext
+  ) async throws -> ObjectMetadata {
+    throw BackendError.notFound
+  }
+
+  func putObject(
+    _ request: PutObjectRequest,
+    context: RequestContext
+  ) async throws -> PutObjectResult {
+    throw BackendError.unavailable(retryable: false)
+  }
+
+  func deleteObject(
+    _ request: DeleteObjectRequest,
+    context: RequestContext
+  ) async throws {}
+
+  func listObjectsV2(
+    _ request: ListObjectsV2Request,
+    context: RequestContext
+  ) async throws -> ListObjectsV2Result {
+    ListObjectsV2Result(
+      objects: [],
+      commonPrefixes: [],
+      nextContinuationToken: nil
+    )
   }
 }
 

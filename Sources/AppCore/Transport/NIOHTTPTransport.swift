@@ -9,11 +9,18 @@ public actor NIOHTTPTransport {
   private let limits: GatewayLimits
   private let group: MultiThreadedEventLoopGroup
   private let requestLimiter: RequestLimiter
+  private let healthClassifier: HealthRouteClassifier
+  private let taskRegistry = TransportTaskRegistry()
   private var serverChannel: Channel?
 
-  public init(configuration: ListenerConfiguration, limits: GatewayLimits) {
+  public init(
+    configuration: ListenerConfiguration,
+    limits: GatewayLimits,
+    healthClassifier: HealthRouteClassifier = .disabled
+  ) {
     self.configuration = configuration
     self.limits = limits
+    self.healthClassifier = healthClassifier
     group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     requestLimiter = RequestLimiter(limit: limits.maximumConcurrentRequests)
   }
@@ -56,7 +63,9 @@ public actor NIOHTTPTransport {
               maximumChunkBytes: self.limits.maximumChunkBytes,
               maximumBufferedChunks: maximumBufferedChunks,
               requestTimeoutSeconds: self.limits.requestTimeoutSeconds,
-              requestLimiter: self.requestLimiter
+              requestLimiter: self.requestLimiter,
+              healthClassifier: self.healthClassifier,
+              taskRegistry: self.taskRegistry
             )
           )
           return channel.eventLoop.makeSucceededVoidFuture()
@@ -72,6 +81,7 @@ public actor NIOHTTPTransport {
       try await serverChannel.close().get()
       self.serverChannel = nil
     }
+    await taskRegistry.beginDrainingAndCancelAll()
     await requestLimiter.beginDraining()
     let drainDeadline = ContinuousClock.now.advanced(
       by: .seconds(limits.requestTimeoutSeconds)
@@ -93,6 +103,12 @@ public actor NIOHTTPTransport {
 
   public var localPort: Int? {
     serverChannel?.localAddress?.port
+  }
+
+  var isSharedRequestLimiterIdle: Bool {
+    get async {
+      await requestLimiter.isIdle
+    }
   }
 
   private static func makeSSLContext(_ configuration: AppCore.TLSConfiguration) throws -> NIOSSLContext {
@@ -119,12 +135,16 @@ private final class HTTP1RequestHandler: ChannelInboundHandler, @unchecked Senda
   private let maximumBufferedChunks: Int
   private let requestTimeoutSeconds: Int
   private let requestLimiter: RequestLimiter
+  private let healthClassifier: HealthRouteClassifier
+  private let taskRegistry: TransportTaskRegistry
   private var bodySource: DemandDrivenRequestBodySource?
   private var receivedBytes: Int64 = 0
   private var requestActive = false
   private var timeoutTask: Scheduled<Void>?
   private var pendingBodyBuffers: [ByteBuffer] = []
   private var inboundEnded = false
+  private var applicationTaskID: UUID?
+  private var applicationTask: Task<Void, Never>?
 
   init(
     application: @escaping HTTPApplicationHandler,
@@ -133,7 +153,9 @@ private final class HTTP1RequestHandler: ChannelInboundHandler, @unchecked Senda
     maximumChunkBytes: Int,
     maximumBufferedChunks: Int,
     requestTimeoutSeconds: Int,
-    requestLimiter: RequestLimiter
+    requestLimiter: RequestLimiter,
+    healthClassifier: HealthRouteClassifier,
+    taskRegistry: TransportTaskRegistry
   ) {
     self.application = application
     self.maximumHeaderBytes = maximumHeaderBytes
@@ -142,6 +164,8 @@ private final class HTTP1RequestHandler: ChannelInboundHandler, @unchecked Senda
     self.maximumBufferedChunks = maximumBufferedChunks
     self.requestTimeoutSeconds = requestTimeoutSeconds
     self.requestLimiter = requestLimiter
+    self.healthClassifier = healthClassifier
+    self.taskRegistry = taskRegistry
   }
 
   func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -167,16 +191,17 @@ private final class HTTP1RequestHandler: ChannelInboundHandler, @unchecked Senda
   }
 
   func errorCaught(context: ChannelHandlerContext, error: any Error) {
-    bodySource?.fail(error)
-    bodySource = nil
+    cancelActiveRequest(error: error)
     context.close(promise: nil)
   }
 
   func channelInactive(context: ChannelHandlerContext) {
-    timeoutTask?.cancel()
-    timeoutTask = nil
-    bodySource?.fail(CancellationError())
-    bodySource = nil
+    cancelActiveRequest(error: CancellationError())
+    context.fireChannelInactive()
+  }
+
+  func handlerRemoved(context: ChannelHandlerContext) {
+    cancelActiveRequest(error: CancellationError())
   }
 
   private func receiveHead(_ head: HTTPRequestHead, context: ChannelHandlerContext) {
@@ -212,10 +237,11 @@ private final class HTTP1RequestHandler: ChannelInboundHandler, @unchecked Senda
     }
     requestActive = true
     receivedBytes = 0
+    let deadline = Date().addingTimeInterval(TimeInterval(requestTimeoutSeconds))
     let timeoutContext = UnsafeSendable(value: context)
-    timeoutTask = context.eventLoop.scheduleTask(in: .seconds(Int64(requestTimeoutSeconds))) { [weak self] in
-      self?.bodySource?.fail(BackendError.deadlineExceeded)
-      self?.bodySource = nil
+    let timeoutInterval = max(1, Int64(deadline.timeIntervalSinceNow * 1_000_000_000))
+    timeoutTask = context.eventLoop.scheduleTask(in: .nanoseconds(timeoutInterval)) { [weak self] in
+      self?.cancelActiveRequest(error: BackendError.deadlineExceeded)
       timeoutContext.value.close(promise: nil)
     }
     let transferredContext = UnsafeSendable(value: context)
@@ -256,31 +282,83 @@ private final class HTTP1RequestHandler: ChannelInboundHandler, @unchecked Senda
       rawQuery: target.query,
       headers: headers,
       body: ObjectBodyStream(maximumChunkBytes: maximumChunkBytes, stream: stream),
-      remoteAddress: context.remoteAddress.map(String.init(describing:))
+      remoteAddress: context.remoteAddress.map(String.init(describing:)),
+      healthClassifier: healthClassifier,
+      deadline: deadline
     )
     let channel = context.channel
-    Task { [application, requestLimiter, transferredContext, channel] in
-      guard await requestLimiter.acquire() else {
-        try? await self.write(
-          response: HTTPTransportResponse(status: 503),
-          channel: channel,
-          transferredContext: transferredContext
-        )
+    let taskID = UUID()
+    let cleanup = RequestExecutionCleanup(
+      requestLimiter: requestLimiter,
+      taskRegistry: taskRegistry,
+      taskID: taskID,
+      requiresSharedPermit: request.healthAdmission == .none
+    )
+    let task = Task { [application, transferredContext, channel] in
+      guard await cleanup.acquirePermit() else {
+        if !Task.isCancelled {
+          try? await self.write(
+            response: HTTPTransportResponse(status: 503),
+            channel: channel,
+            transferredContext: transferredContext
+          )
+        }
+        await cleanup.finish()
+        self.applicationDidFinish(taskID, context: transferredContext)
         return
       }
       let response = await application(request)
-      do {
-        try await self.write(response: response, channel: channel, transferredContext: transferredContext)
-        await requestLimiter.release()
-      } catch {
-        await requestLimiter.release()
-        transferredContext.value.eventLoop.execute { transferredContext.value.close(promise: nil) }
+      if !Task.isCancelled {
+        do {
+          try await self.write(
+            response: response,
+            channel: channel,
+            transferredContext: transferredContext
+          )
+        } catch {
+          withUnsafeCurrentTask {
+            $0?.cancel()
+          }
+          transferredContext.value.eventLoop.execute {
+            transferredContext.value.close(promise: nil)
+          }
+        }
       }
+      await cleanup.finish()
+      self.applicationDidFinish(taskID, context: transferredContext)
+    }
+    applicationTaskID = taskID
+    applicationTask = task
+    Task {
+      await taskRegistry.register(task, id: taskID)
     }
     if transferEncodings.isEmpty,
        contentLengths.isEmpty || contentLengths == ["0"] {
       context.read()
     }
+  }
+
+  private func applicationDidFinish(
+    _ taskID: UUID,
+    context: UnsafeSendable<ChannelHandlerContext>
+  ) {
+    context.value.eventLoop.execute { [weak self] in
+      guard self?.applicationTaskID == taskID else {
+        return
+      }
+      self?.timeoutTask?.cancel()
+      self?.timeoutTask = nil
+      self?.applicationTask = nil
+      self?.applicationTaskID = nil
+    }
+  }
+
+  private func cancelActiveRequest(error: any Error) {
+    timeoutTask?.cancel()
+    timeoutTask = nil
+    bodySource?.fail(error)
+    bodySource = nil
+    applicationTask?.cancel()
   }
 
   private func receiveBody(_ buffer: inout ByteBuffer, context: ChannelHandlerContext) {
@@ -408,7 +486,7 @@ private actor RequestLimiter {
   init(limit: Int) { self.limit = limit }
 
   func acquire() -> Bool {
-    guard !draining, active < limit else { return false }
+    guard !Task.isCancelled, !draining, active < limit else { return false }
     active += 1
     return true
   }
@@ -423,6 +501,86 @@ private actor RequestLimiter {
 
   var isIdle: Bool {
     active == 0
+  }
+}
+
+private actor TransportTaskRegistry {
+  private var tasks: [UUID: Task<Void, Never>] = [:]
+  private var completedBeforeRegistration: Set<UUID> = []
+  private var draining = false
+
+  func register(_ task: Task<Void, Never>, id: UUID) {
+    if completedBeforeRegistration.remove(id) != nil {
+      return
+    }
+    guard !draining else {
+      task.cancel()
+      return
+    }
+    tasks[id] = task
+  }
+
+  func remove(id: UUID) {
+    if tasks.removeValue(forKey: id) == nil {
+      completedBeforeRegistration.insert(id)
+    }
+  }
+
+  func beginDrainingAndCancelAll() {
+    draining = true
+    let activeTasks = tasks.values
+    tasks.removeAll()
+    completedBeforeRegistration.removeAll()
+    for task in activeTasks {
+      task.cancel()
+    }
+  }
+}
+
+private actor RequestExecutionCleanup {
+  private let requestLimiter: RequestLimiter
+  private let taskRegistry: TransportTaskRegistry
+  private let taskID: UUID
+  private let requiresSharedPermit: Bool
+  private var acquiredSharedPermit = false
+  private var finished = false
+
+  init(
+    requestLimiter: RequestLimiter,
+    taskRegistry: TransportTaskRegistry,
+    taskID: UUID,
+    requiresSharedPermit: Bool
+  ) {
+    self.requestLimiter = requestLimiter
+    self.taskRegistry = taskRegistry
+    self.taskID = taskID
+    self.requiresSharedPermit = requiresSharedPermit
+  }
+
+  func acquirePermit() async -> Bool {
+    guard !finished else {
+      return false
+    }
+    guard requiresSharedPermit else {
+      return !Task.isCancelled
+    }
+    guard await requestLimiter.acquire() else {
+      return false
+    }
+    acquiredSharedPermit = true
+    return true
+  }
+
+  func finish() async {
+    guard !finished else {
+      return
+    }
+    finished = true
+    if acquiredSharedPermit {
+      acquiredSharedPermit = false
+      await requestLimiter.release()
+    }
+    await taskRegistry.remove(id: taskID)
   }
 }
 

@@ -40,11 +40,13 @@ import Testing
     responses: [UpstreamResponseSpec(status: 200, headers: [:], body: Data())]
   )
   let backend = try makeS3Backend(client: client)
-  try await backend.readinessCheck()
+  let deadline = Date().addingTimeInterval(30)
+  try await backend.readinessCheck(deadline: deadline)
   let request = try #require(await client.requests.first)
   #expect(request.method == "HEAD")
   #expect(request.url.path == "/upstream-bucket")
   #expect(request.headers.contains { $0.0 == "authorization" })
+  #expect(request.deadline == deadline)
 }
 
 @Test func s3BackendReadinessFailsForRejectedBucketProbe() async throws {
@@ -53,8 +55,34 @@ import Testing
   )
   let backend = try makeS3Backend(client: client)
   await #expect(throws: BackendError.unavailable(retryable: false)) {
-    try await backend.readinessCheck()
+    try await backend.readinessCheck(deadline: Date().addingTimeInterval(30))
   }
+}
+
+@Test func s3BackendReadinessRejectsExpiredDeadlineBeforeSigningOrUpstreamWork() async throws {
+  let client = RecordingUpstreamClient(responses: [])
+  let backend = try makeS3Backend(client: client)
+
+  await #expect(throws: BackendError.deadlineExceeded) {
+    try await backend.readinessCheck(deadline: Date().addingTimeInterval(-1))
+  }
+  #expect(await client.requests.isEmpty)
+}
+
+@Test func cancellingS3ReadinessInterruptsBlockingUpstreamWork() async throws {
+  let client = BlockingReadinessUpstreamClient()
+  let backend = try makeS3Backend(client: client)
+  let task = Task {
+    try await backend.readinessCheck(deadline: Date().addingTimeInterval(30))
+  }
+  await client.waitUntilStarted()
+  task.cancel()
+
+  await #expect(throws: BackendError.cancelled) {
+    try await task.value
+  }
+  await client.waitUntilCancelled()
+  #expect(await client.cancelledInvocations == 1)
 }
 
 @Test func s3BackendPreservesTotalObjectLengthForRangeResponses() async throws {
@@ -420,7 +448,7 @@ import Testing
 }
 
 private func makeS3Backend(
-  client: RecordingUpstreamClient,
+  client: any UpstreamHTTPClient,
   stagingDirectory: String? = nil,
   maximumXMLBytes: Int = 1 * 1_024 * 1_024
 ) throws -> S3Backend {
@@ -460,6 +488,7 @@ private struct CapturedUpstreamRequest: Sendable {
   let url: URL
   let headers: [(String, String)]
   let body: Data
+  let deadline: Date?
 }
 
 private actor RecordingUpstreamClient: UpstreamHTTPClient {
@@ -476,7 +505,8 @@ private actor RecordingUpstreamClient: UpstreamHTTPClient {
         method: request.method,
         url: request.url,
         headers: request.headers,
-        body: await collector.data
+        body: await collector.data,
+        deadline: request.deadline
       )
     )
     guard !responses.isEmpty else { throw BackendError.unavailable(retryable: false) }
@@ -486,6 +516,54 @@ private actor RecordingUpstreamClient: UpstreamHTTPClient {
       headers: response.headers,
       body: ObjectBodyStream(data: response.body, maximumChunkBytes: 4_096)
     )
+  }
+}
+
+private actor BlockingReadinessUpstreamClient: UpstreamHTTPClient {
+  private(set) var cancelledInvocations = 0
+  private var started = false
+  private var cancelled = false
+  private var startWaiters: [CheckedContinuation<Void, Never>] = []
+  private var cancellationWaiters: [CheckedContinuation<Void, Never>] = []
+
+  func execute(_ request: UpstreamHTTPRequest) async throws -> UpstreamHTTPResponse {
+    started = true
+    let startWaiters = self.startWaiters
+    self.startWaiters.removeAll()
+    for waiter in startWaiters {
+      waiter.resume()
+    }
+    do {
+      try await Task.sleep(for: .seconds(30))
+      throw BackendError.consistencyFailure
+    } catch is CancellationError {
+      cancelledInvocations += 1
+      cancelled = true
+      let cancellationWaiters = self.cancellationWaiters
+      self.cancellationWaiters.removeAll()
+      for waiter in cancellationWaiters {
+        waiter.resume()
+      }
+      throw CancellationError()
+    }
+  }
+
+  func waitUntilStarted() async {
+    guard !started else {
+      return
+    }
+    await withCheckedContinuation {
+      startWaiters.append($0)
+    }
+  }
+
+  func waitUntilCancelled() async {
+    guard !cancelled else {
+      return
+    }
+    await withCheckedContinuation {
+      cancellationWaiters.append($0)
+    }
   }
 }
 

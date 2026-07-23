@@ -1,0 +1,22 @@
+Stage 1 literal object-larger-than-memory gate
+Date: 2026-07-23
+Host physical memory: 34359738368 bytes
+Object size: 33792 MiB (35433480192 bytes)
+Gateway peak RSS: 16048 KiB
+Client: aws-cli/2.35.11 Python/3.14.6 Darwin/25.5.0 source/arm64
+Result: PASS
+
+Command:
+
+MAXIMUM_OBJECT_BYTES=36507222016 \
+REQUEST_TIMEOUT_SECONDS=3600 \
+STAGE1_STREAMING_OBJECT_MIB=33792 \
+STAGE1_STREAMING_DISCARD_DOWNLOAD=1 \
+STAGE1_REQUIRE_OBJECT_LARGER_THAN_PHYSICAL_MEMORY=1 \
+GATEWAY_BINARY=.build/release/swift-s3-gateway \
+scripts/test-aws-cli-stage1.sh
+
+The harness asserted the object size exceeded `sysctl -n hw.memsize` before the
+transfer. It used a sparse input, validated the signed PUT while reading every
+byte, streamed the complete GET to `/dev/null`, and failed unless gateway peak
+RSS remained below the object size.

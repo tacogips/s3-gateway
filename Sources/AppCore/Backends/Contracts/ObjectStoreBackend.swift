@@ -22,7 +22,7 @@ public struct BackendCapabilities: Codable, Equatable, Sendable {
 public protocol ObjectStoreBackend: Sendable {
   var kind: BackendKind { get }
   func capabilities() async -> BackendCapabilities
-  func readinessCheck() async throws
+  func readinessCheck(deadline: Date) async throws
   func getObject(_ request: GetObjectRequest, context: RequestContext) async throws -> GetObjectResult
   func headObject(_ request: HeadObjectRequest, context: RequestContext) async throws -> ObjectMetadata
   func putObject(_ request: PutObjectRequest, context: RequestContext) async throws -> PutObjectResult
@@ -34,7 +34,11 @@ public protocol ObjectStoreBackend: Sendable {
 }
 
 public extension ObjectStoreBackend {
-  func readinessCheck() async throws {}
+  func readinessCheck(deadline: Date) async throws {
+    guard deadline > Date() else {
+      throw BackendError.deadlineExceeded
+    }
+  }
 }
 
 public enum BackendError: Error, Equatable, Sendable {

@@ -19,6 +19,15 @@ struct POSIXCommitRecord: Codable, Sendable {
 
 struct POSIXMetadataStore: Sendable {
   let mapper: POSIXPathMapper
+  let faultInjector: POSIXFaultInjector
+
+  init(
+    mapper: POSIXPathMapper,
+    faultInjector: POSIXFaultInjector = POSIXFaultInjector()
+  ) {
+    self.mapper = mapper
+    self.faultInjector = faultInjector
+  }
 
   func load(bucket: BucketName, key: ObjectKey, identity: FileIdentity) throws -> ObjectMetadata? {
     guard !FileManager.default.fileExists(
@@ -71,10 +80,12 @@ struct POSIXMetadataStore: Sendable {
   }
 
   func prepareCommit(_ record: POSIXCommitRecord) throws {
+    try faultInjector.inject(.commitRecord)
     try write(record, to: mapper.commitFileURL(bucket: record.bucket, key: record.key))
   }
 
   func finishCommit(_ record: POSIXCommitRecord) throws {
+    try faultInjector.inject(.metadataPublication)
     try store(
       bucket: record.bucket,
       key: record.key,

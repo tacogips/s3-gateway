@@ -116,6 +116,7 @@ import Testing
   )
   let completion = TransportBodyCompletionRecorder()
   try await transport.start { request in
+    await completion.markStarted()
     do {
       try await request.body.consume { _ in }
       await completion.record(completedNormally: true)
@@ -125,21 +126,18 @@ import Testing
     return HTTPTransportResponse(status: 500)
   }
   let port = try #require(await transport.localPort)
-  _ = try sendRawHTTPRequest(
+  let descriptor = try openRawHTTPRequest(
     port: port,
     request:
       "PUT /bucket/interrupted HTTP/1.1\r\n" +
       "Host: localhost\r\n" +
       "Content-Length: 1048576\r\n" +
       "Connection: close\r\n\r\n" +
-      String(repeating: "x", count: 4_096),
-    readResponse: false
+      String(repeating: "x", count: 4_096)
   )
-  for _ in 0..<100 {
-    if await completion.completedNormally != nil { break }
-    try await Task.sleep(for: .milliseconds(5))
-  }
-  #expect(await completion.completedNormally == false)
+  await completion.waitUntilStarted()
+  close(descriptor)
+  #expect(await completion.waitForResult() == false)
   try await transport.stop()
 }
 
@@ -450,7 +448,7 @@ import Testing
   let key = try ObjectKey(validating: "nested/file.txt")
   let context = try controlledS3Context()
 
-  try await backend.readinessCheck()
+  try await backend.readinessCheck(deadline: Date().addingTimeInterval(30))
   let uploaded = Data(repeating: 23, count: 96 * 1_024)
   let put = try await backend.putObject(
     PutObjectRequest(
@@ -503,66 +501,10 @@ import Testing
   try await transport.stop()
 }
 
-@Test func nioTransportDrainsActiveRequestBeforeShutdown() async throws {
-  let transport = NIOHTTPTransport(
-    configuration: ListenerConfiguration(
-      host: "127.0.0.1",
-      port: 0,
-      developmentPlaintext: true
-    ),
-    limits: GatewayLimits(
-      maximumHeaderBytes: 8_192,
-      maximumXMLBytes: 8_192,
-      maximumObjectBytes: 1_024 * 1_024,
-      maximumChunkBytes: 4_096,
-      maximumInFlightBytes: 16 * 1_024,
-      maximumConcurrentRequests: 2,
-      requestTimeoutSeconds: 2
-    )
-  )
-  let signal = TransportStartSignal()
-  try await transport.start { _ in
-    await signal.markStarted()
-    try? await Task.sleep(for: .milliseconds(150))
-    return HTTPTransportResponse(status: 200, data: Data("drained".utf8))
-  }
-  let port = try #require(await transport.localPort)
-  let url = try #require(URL(string: "http://127.0.0.1:\(port)/drain"))
-  let client = Task {
-    try await URLSession.shared.data(from: url)
-  }
-  await signal.waitUntilStarted()
-  try await transport.stop()
-  let (data, response) = try await client.value
-  #expect((response as? HTTPURLResponse)?.statusCode == 200)
-  #expect(data == Data("drained".utf8))
-}
-
 private actor TransportDataCollector {
   private(set) var data = Data()
 
   func append(_ chunk: Data) { data.append(chunk) }
-}
-
-private actor TransportStartSignal {
-  private var started = false
-  private var waiters: [CheckedContinuation<Void, Never>] = []
-
-  func markStarted() {
-    started = true
-    let waiters = self.waiters
-    self.waiters.removeAll()
-    for waiter in waiters {
-      waiter.resume()
-    }
-  }
-
-  func waitUntilStarted() async {
-    guard !started else { return }
-    await withCheckedContinuation { continuation in
-      waiters.append(continuation)
-    }
-  }
 }
 
 private actor ControlledS3Recorder {
@@ -711,16 +653,36 @@ private func sendRawHTTPRequest(
   request: String,
   readResponse: Bool = true
 ) throws -> Data {
+  let descriptor = try openRawHTTPRequest(port: port, request: request)
+  defer { close(descriptor) }
+  guard readResponse else { return Data() }
+  var result = Data()
+  var buffer = [UInt8](repeating: 0, count: 4_096)
+  while true {
+    let count = Darwin.read(descriptor, &buffer, buffer.count)
+    guard count >= 0 else {
+      throw ProcessTestError.failed("read failed")
+    }
+    if count == 0 { break }
+    result.append(contentsOf: buffer.prefix(count))
+  }
+  return result
+}
+
+private func openRawHTTPRequest(
+  port: Int,
+  request: String
+) throws -> Int32 {
   let descriptor = socket(AF_INET, SOCK_STREAM, 0)
   guard descriptor >= 0 else {
     throw ProcessTestError.failed("socket failed")
   }
-  defer { close(descriptor) }
   var address = sockaddr_in()
   address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
   address.sin_family = sa_family_t(AF_INET)
   address.sin_port = in_port_t(port).bigEndian
   guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1 else {
+    close(descriptor)
     throw ProcessTestError.failed("inet_pton failed")
   }
   let connected = withUnsafePointer(to: &address) { pointer in
@@ -733,6 +695,7 @@ private func sendRawHTTPRequest(
     }
   }
   guard connected == 0 else {
+    close(descriptor)
     throw ProcessTestError.failed("connect failed")
   }
   let bytes = Data(request.utf8)
@@ -746,23 +709,13 @@ private func sendRawHTTPRequest(
         rawBuffer.count - offset
       )
       guard written > 0 else {
+        close(descriptor)
         throw ProcessTestError.failed("write failed")
       }
       offset += written
     }
   }
-  guard readResponse else { return Data() }
-  var result = Data()
-  var buffer = [UInt8](repeating: 0, count: 4_096)
-  while true {
-    let count = Darwin.read(descriptor, &buffer, buffer.count)
-    guard count >= 0 else {
-      throw ProcessTestError.failed("read failed")
-    }
-    if count == 0 { break }
-    result.append(contentsOf: buffer.prefix(count))
-  }
-  return result
+  return descriptor
 }
 
 private struct RawObservedTransportRequest: Sendable {
@@ -791,8 +744,43 @@ private actor RawTransportRequestRecorder {
 
 private actor TransportBodyCompletionRecorder {
   private(set) var completedNormally: Bool?
+  private var started = false
+  private var startWaiters: [CheckedContinuation<Void, Never>] = []
+  private var resultWaiters: [CheckedContinuation<Bool, Never>] = []
+
+  func markStarted() {
+    started = true
+    let waiters = startWaiters
+    startWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume()
+    }
+  }
 
   func record(completedNormally: Bool) {
     self.completedNormally = completedNormally
+    let waiters = resultWaiters
+    resultWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume(returning: completedNormally)
+    }
+  }
+
+  func waitUntilStarted() async {
+    guard !started else {
+      return
+    }
+    await withCheckedContinuation {
+      startWaiters.append($0)
+    }
+  }
+
+  func waitForResult() async -> Bool {
+    if let completedNormally {
+      return completedNormally
+    }
+    return await withCheckedContinuation {
+      resultWaiters.append($0)
+    }
   }
 }

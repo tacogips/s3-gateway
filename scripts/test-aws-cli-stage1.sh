@@ -12,10 +12,14 @@ gateway_port=${GATEWAY_PORT:-18443}
 maximum_object_bytes=${MAXIMUM_OBJECT_BYTES:-104857600}
 request_timeout_seconds=${REQUEST_TIMEOUT_SECONDS:-30}
 streaming_object_mib=${STAGE1_STREAMING_OBJECT_MIB:-0}
+streaming_discard_download=${STAGE1_STREAMING_DISCARD_DOWNLOAD:-0}
+require_larger_than_physical_memory=${STAGE1_REQUIRE_OBJECT_LARGER_THAN_PHYSICAL_MEMORY:-0}
 crash_recovery_mib=${STAGE1_CRASH_RECOVERY_MIB:-0}
 [[ "$maximum_object_bytes" =~ ^[1-9][0-9]*$ ]]
 [[ "$request_timeout_seconds" =~ ^[1-9][0-9]*$ ]]
 [[ "$streaming_object_mib" =~ ^[0-9]+$ ]]
+[[ "$streaming_discard_download" =~ ^[01]$ ]]
+[[ "$require_larger_than_physical_memory" =~ ^[01]$ ]]
 [[ "$crash_recovery_mib" =~ ^[0-9]+$ ]]
 if [[ ! -x "$gateway_binary" ]]; then
   echo "Build the gateway first or set GATEWAY_BINARY." >&2
@@ -319,7 +323,14 @@ if (( streaming_object_mib > 0 )); then
   streaming_output="$work_directory/streaming-output.bin"
   rss_stop="$work_directory/stop-streaming-rss"
   rss_result="$work_directory/streaming-maximum-rss-kib.txt"
-  dd if=/dev/zero of="$streaming_input" bs=1048576 count="$streaming_object_mib" 2>/dev/null
+  dd if=/dev/zero of="$streaming_input" bs=1 count=0 seek="$streaming_bytes" 2>/dev/null
+  if (( require_larger_than_physical_memory == 1 )); then
+    physical_memory_bytes=$(sysctl -n hw.memsize)
+    if (( streaming_bytes <= physical_memory_bytes )); then
+      echo "The streaming object is not larger than physical memory." >&2
+      exit 2
+    fi
+  fi
   (
     maximum_rss_kib=0
     while [[ ! -e "$rss_stop" ]] && kill -0 "$gateway_pid" 2>/dev/null; do
@@ -338,12 +349,20 @@ if (( streaming_object_mib > 0 )); then
     --key compatibility/streaming-large.bin \
     --body "$streaming_input" \
     >/dev/null
-  aws "${aws_arguments[@]}" s3api get-object \
-    --bucket test-bucket \
-    --key compatibility/streaming-large.bin \
-    "$streaming_output" \
-    >/dev/null
-  cmp "$streaming_input" "$streaming_output"
+  if (( streaming_discard_download == 1 )); then
+    aws "${aws_arguments[@]}" s3api get-object \
+      --bucket test-bucket \
+      --key compatibility/streaming-large.bin \
+      /dev/null \
+      >/dev/null
+  else
+    aws "${aws_arguments[@]}" s3api get-object \
+      --bucket test-bucket \
+      --key compatibility/streaming-large.bin \
+      "$streaming_output" \
+      >/dev/null
+    cmp "$streaming_input" "$streaming_output"
+  fi
   touch "$rss_stop"
   wait "$rss_sampler_pid"
   maximum_rss_kib=$(sed -n '1p' "$rss_result")
@@ -355,7 +374,11 @@ if (( streaming_object_mib > 0 )); then
   if [[ -n ${STAGE1_STREAMING_RESULT_FILE:-} ]]; then
     cp "$rss_result" "$STAGE1_STREAMING_RESULT_FILE"
   fi
-  echo "Large-object streaming passed: ${streaming_object_mib} MiB object, ${maximum_rss_kib} KiB peak gateway RSS"
+  if (( require_larger_than_physical_memory == 1 )); then
+    echo "Large-object streaming passed: ${streaming_object_mib} MiB object exceeded ${physical_memory_bytes} bytes physical memory, ${maximum_rss_kib} KiB peak gateway RSS"
+  else
+    echo "Large-object streaming passed: ${streaming_object_mib} MiB object, ${maximum_rss_kib} KiB peak gateway RSS"
+  fi
 fi
 
 presigned_url=$(aws "${aws_arguments[@]}" s3 presign \

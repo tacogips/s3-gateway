@@ -40,13 +40,33 @@ final class NIOUpstreamHTTPClient: UpstreamHTTPClient, @unchecked Sendable {
   func execute(_ request: UpstreamHTTPRequest) async throws -> UpstreamHTTPResponse {
     guard request.url.scheme == "https", let host = request.url.host else { throw BackendError.accessDenied }
     let port = request.url.port ?? 443
-    let timeout = try effectiveTimeout(deadline: request.deadline)
+    let connectTimeout = try effectiveTimeout(deadline: request.deadline)
     let state = UpstreamResponseState(
       maximumChunkBytes: maximumChunkBytes,
       maximumBufferedChunks: maximumBufferedChunks
     )
+    return try await withTaskCancellationHandler {
+      try await execute(
+        request,
+        host: host,
+        port: port,
+        connectTimeout: connectTimeout,
+        state: state
+      )
+    } onCancel: {
+      state.cancel()
+    }
+  }
+
+  private func execute(
+    _ request: UpstreamHTTPRequest,
+    host: String,
+    port: Int,
+    connectTimeout: TimeAmount,
+    state: UpstreamResponseState
+  ) async throws -> UpstreamHTTPResponse {
     let channel = try await ClientBootstrap(group: group)
-      .connectTimeout(timeout)
+      .connectTimeout(connectTimeout)
       .channelOption(ChannelOptions.maxMessagesPerRead, value: 1)
       .channelOption(
         ChannelOptions.recvAllocator,
@@ -187,8 +207,18 @@ private final class UpstreamResponseState: @unchecked Sendable {
 
   func setChannel(_ channel: Channel) {
     lock.lock()
+    guard !completed else {
+      lock.unlock()
+      channel.close(promise: nil)
+      return
+    }
     self.channel = channel
     lock.unlock()
+  }
+
+  func cancel() {
+    fail(CancellationError())
+    closeChannel()
   }
 
   func waitForEmptyBodyCompletion() async throws {

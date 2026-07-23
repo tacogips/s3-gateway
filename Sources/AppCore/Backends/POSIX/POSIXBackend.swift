@@ -9,15 +9,31 @@ public actor POSIXBackend: ObjectStoreBackend {
   private let mapper: POSIXPathMapper
   private let metadataStore: POSIXMetadataStore
   private let maximumChunkBytes: Int
+  private let faultInjector: POSIXFaultInjector
 
   public init(
     configuration: POSIXBackendConfiguration,
     maximumChunkBytes: Int = 64 * 1_024,
     fileSystem: FileSystemInspecting = LocalFileSystemInspector()
   ) throws {
+    try self.init(
+      configuration: configuration,
+      maximumChunkBytes: maximumChunkBytes,
+      fileSystem: fileSystem,
+      faultInjector: POSIXFaultInjector()
+    )
+  }
+
+  init(
+    configuration: POSIXBackendConfiguration,
+    maximumChunkBytes: Int,
+    fileSystem: FileSystemInspecting = LocalFileSystemInspector(),
+    faultInjector: POSIXFaultInjector
+  ) throws {
     try configuration.validate(fileSystem: fileSystem)
     self.configuration = configuration
     self.maximumChunkBytes = maximumChunkBytes
+    self.faultInjector = faultInjector
     var rootInformation = stat()
     guard lstat(configuration.rootPath, &rootInformation) == 0 else {
       throw ConfigurationError.unreadable(path: configuration.rootPath)
@@ -30,7 +46,7 @@ public actor POSIXBackend: ObjectStoreBackend {
       rootDevice: UInt64(rootInformation.st_dev),
       durability: configuration.durability
     )
-    metadataStore = POSIXMetadataStore(mapper: mapper)
+    metadataStore = POSIXMetadataStore(mapper: mapper, faultInjector: faultInjector)
     try metadataStore.recoverPendingCommits()
     try mapper.cleanupAbandonedTemporaryFiles()
     for relative in configuration.bucketDirectories.values {
@@ -58,7 +74,10 @@ public actor POSIXBackend: ObjectStoreBackend {
     )
   }
 
-  public func readinessCheck() async throws {
+  public func readinessCheck(deadline: Date) async throws {
+    guard deadline > Date() else {
+      throw BackendError.deadlineExceeded
+    }
     try mapper.readinessCheck()
   }
 
@@ -126,7 +145,8 @@ public actor POSIXBackend: ObjectStoreBackend {
       let accumulator = POSIXWriteAccumulator(
         file: temporary.handle,
         expectedLength: request.knownContentLength,
-        deadline: context.deadline
+        deadline: context.deadline,
+        faultInjector: faultInjector
       )
       try await request.body.consume { chunk in
         try await accumulator.append(chunk)
@@ -483,14 +503,21 @@ private actor POSIXWriteAccumulator {
   private let file: FileHandle
   private let expectedLength: Int64?
   private let deadline: Date
+  private let faultInjector: POSIXFaultInjector
   private var length: Int64 = 0
   private var md5 = Insecure.MD5()
   private var sha256 = SHA256()
 
-  init(file: FileHandle, expectedLength: Int64?, deadline: Date) {
+  init(
+    file: FileHandle,
+    expectedLength: Int64?,
+    deadline: Date,
+    faultInjector: POSIXFaultInjector
+  ) {
     self.file = file
     self.expectedLength = expectedLength
     self.deadline = deadline
+    self.faultInjector = faultInjector
   }
 
   func append(_ chunk: Data) throws {
@@ -512,8 +539,11 @@ private actor POSIXWriteAccumulator {
     }
     switch durability {
     case .relaxed: break
-    case .data: try file.synchronize()
+    case .data:
+      try faultInjector.inject(.dataSynchronization)
+      try file.synchronize()
     case .strict:
+      try faultInjector.inject(.dataSynchronization)
       try file.synchronize()
       guard fcntl(file.fileDescriptor, F_FULLFSYNC) == 0 else { throw BackendError.consistencyFailure }
     }

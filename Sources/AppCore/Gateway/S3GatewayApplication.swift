@@ -7,7 +7,8 @@ public struct S3GatewayApplication: Sendable {
   private let pagination: PaginationTokenService
   private let service: GatewayService
   private let limits: GatewayLimits
-  private let health: HealthEndpointConfiguration?
+  private let healthClassifier: HealthRouteClassifier
+  private let readinessGate: ReadinessGate
   private let telemetry: any GatewayTelemetrySink
 
   public init(
@@ -18,6 +19,7 @@ public struct S3GatewayApplication: Sendable {
     service: GatewayService,
     limits: GatewayLimits,
     health: HealthEndpointConfiguration? = nil,
+    healthClassifier: HealthRouteClassifier? = nil,
     telemetry: any GatewayTelemetrySink = NoopGatewayTelemetrySink()
   ) {
     self.router = router
@@ -26,7 +28,8 @@ public struct S3GatewayApplication: Sendable {
     self.pagination = pagination
     self.service = service
     self.limits = limits
-    self.health = health
+    self.healthClassifier = healthClassifier ?? HealthRouteClassifier(configuration: health)
+    readinessGate = ReadinessGate()
     self.telemetry = telemetry
   }
 
@@ -56,7 +59,23 @@ public struct S3GatewayApplication: Sendable {
   }
 
   private func response(for request: HTTPTransportRequest) async -> HTTPTransportResponse {
-    if let response = await healthResponse(request) { return response }
+    let healthAdmission = healthClassifier.classify(
+      method: request.method,
+      rawPath: request.rawPath,
+      rawQuery: request.rawQuery
+    )
+    guard healthAdmission == request.healthAdmission else {
+      return HTTPTransportResponse(
+        status: 500,
+        headers: [
+          ("content-length", "0"),
+          ("cache-control", "no-store")
+        ]
+      )
+    }
+    if healthAdmission != .none {
+      return await healthResponse(request, admission: healthAdmission)
+    }
     let requestID = UUID().uuidString.lowercased()
     do {
       return try await handleAuthorized(request, requestID: requestID)
@@ -87,27 +106,41 @@ public struct S3GatewayApplication: Sendable {
     }
   }
 
-  private func healthResponse(_ request: HTTPTransportRequest) async -> HTTPTransportResponse? {
-    guard let health,
-          request.rawQuery.isEmpty,
-          request.method == "GET" || request.method == "HEAD" else { return nil }
+  private func healthResponse(
+    _ request: HTTPTransportRequest,
+    admission: HealthAdmission
+  ) async -> HTTPTransportResponse {
     let state: String
     let status: Int
-    switch request.rawPath {
-    case health.livenessPath:
+    switch admission {
+    case .liveness:
       state = "live"
       status = 200
-    case health.readinessPath:
+    case .readiness:
+      guard await readinessGate.acquire() else {
+        return fixedHealthResponse(state: "not-ready", status: 503, method: request.method)
+      }
       do {
-        try await service.readinessCheck()
+        try await service.readinessCheck(deadline: request.deadline)
+        await readinessGate.release()
         state = "ready"
         status = 200
       } catch {
+        await readinessGate.release()
         state = "not-ready"
         status = 503
       }
-    default: return nil
+    case .none:
+      return HTTPTransportResponse(status: 500, headers: [("content-length", "0")])
     }
+    return fixedHealthResponse(state: state, status: status, method: request.method)
+  }
+
+  private func fixedHealthResponse(
+    state: String,
+    status: Int,
+    method: String
+  ) -> HTTPTransportResponse {
     let data = Data("{\"status\":\"\(state)\"}\n".utf8)
     return HTTPTransportResponse(
       status: status,
@@ -116,7 +149,7 @@ public struct S3GatewayApplication: Sendable {
         ("content-length", String(data.count)),
         ("cache-control", "no-store")
       ],
-      body: request.method == "HEAD" ? nil : ObjectBodyStream(data: data)
+      body: method == "HEAD" ? nil : ObjectBodyStream(data: data)
     )
   }
 
@@ -176,7 +209,7 @@ public struct S3GatewayApplication: Sendable {
     let context = RequestContext(
       requestID: requestID,
       principalID: authentication.principalID,
-      deadline: Date().addingTimeInterval(TimeInterval(limits.requestTimeoutSeconds))
+      deadline: request.deadline
     )
     switch routed.operation {
     case .getObject:
@@ -262,7 +295,16 @@ public struct S3GatewayApplication: Sendable {
     let metadata = try userMetadata(request)
     var expectedChecksums = try checksumHeaders(request)
     if let signatureChecksum = Self.sha256Checksum(hex: payloadHash) {
-      expectedChecksums.append(signatureChecksum)
+      if let explicitChecksum = expectedChecksums.first(where: { $0.algorithm == .sha256 }) {
+        guard explicitChecksum.base64Value == signatureChecksum.base64Value else {
+          throw GatewayError(
+            code: .badDigest,
+            safeMessage: "The payload hash and checksum do not match."
+          )
+        }
+      } else {
+        expectedChecksums.append(signatureChecksum)
+      }
     }
     let result = try await service.put(
       PutObjectRequest(
@@ -551,5 +593,21 @@ public struct S3GatewayApplication: Sendable {
       index = next
     }
     return ObjectChecksum(algorithm: .sha256, base64Value: bytes.base64EncodedString())
+  }
+}
+
+private actor ReadinessGate {
+  private var acquired = false
+
+  func acquire() -> Bool {
+    guard !acquired, !Task.isCancelled else {
+      return false
+    }
+    acquired = true
+    return true
+  }
+
+  func release() {
+    acquired = false
   }
 }

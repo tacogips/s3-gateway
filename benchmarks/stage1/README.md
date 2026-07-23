@@ -51,6 +51,15 @@ The gate samples only the gateway PID during the upload and download, verifies
 the downloaded bytes, and fails unless the peak gateway RSS is smaller than the
 object. `STAGE1_STREAMING_RESULT_FILE` optionally retains the peak RSS value.
 
+For the literal object-larger-than-host-memory gate, use a size greater than
+`sysctl -n hw.memsize`, enable
+`STAGE1_REQUIRE_OBJECT_LARGER_THAN_PHYSICAL_MEMORY=1`, and set
+`STAGE1_STREAMING_DISCARD_DOWNLOAD=1`. The input is sparse, the signed PUT still
+reads and validates every byte, and the GET must transfer the complete response
+to `/dev/null`; this avoids retaining an unnecessary third full-size copy. The
+explicit memory assertion fails before the transfer if the selected object is
+not larger than physical memory.
+
 Set `STAGE1_CRASH_RECOVERY_MIB` with a matching `MAXIMUM_OBJECT_BYTES` to run the
 process-interruption gate. It starts a signed PUT of a sparse input, waits until
 the gateway has written staged bytes, sends SIGKILL, restarts the gateway with

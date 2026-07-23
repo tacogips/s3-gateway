@@ -133,6 +133,85 @@ library.
 9. `S3ResponseEncoder` maps the result or typed error to an S3 response. Telemetry
    records only sanitized identifiers and dimensions.
 
+### Health-Probe Isolation and Request Lifetime
+
+Configured liveness and readiness routes are unauthenticated control-plane
+traffic, not object operations. Server composition creates one immutable
+health-route classifier from the validated `HealthEndpointConfiguration` and
+shares that value with the transport and `S3GatewayApplication`; neither boundary
+implements an independent path predicate. The classifier returns `liveness`,
+`readiness`, or `none` and selects health traffic only for an exact configured raw
+path, an empty raw query, and method `GET` or `HEAD`. Missing health
+configuration, differing methods, nonempty queries, and every near match classify
+as `none` and continue through the shared limiter and normal authentication.
+
+The transport is authoritative for admission selection: one classifier invocation
+both selects the shared-limiter path and records its result as the health admission
+class carried by `HTTPTransportRequest`. The request also carries the absolute
+deadline created when the transport accepts the request head. Before any health,
+authentication, or storage work, `S3GatewayApplication` recomputes the class with
+the shared classifier. A mismatch is an internal invariant failure and returns a
+bounded, detail-free `500` response; it never falls through to authenticated work
+after the transport has bypassed the shared limiter. Tests and non-network callers
+construct requests through the same classifier rather than setting a trusted
+health class independently.
+
+Validated health traffic does not acquire the shared authenticated-request
+limiter. `S3GatewayApplication` owns a dedicated, fail-fast readiness gate with
+capacity one; the transport does not own or release this permit. The application
+acquires the permit immediately before `GatewayService.readinessCheck` and uses
+task-lifetime cleanup equivalent to `defer` to release it exactly once on success,
+failure, deadline expiry, or cancellation. This keeps at most one backend
+readiness probe in flight and reserves all authenticated-request capacity for
+object operations. A readiness request rejected by that gate returns the same
+fixed `503 {"status":"not-ready"}` representation as any other readiness failure.
+Liveness performs no backend work and retains its fixed response.
+
+The request deadline starts when the transport accepts the request head. The same
+absolute deadline governs the transport timeout and is passed from
+`S3GatewayApplication` through `GatewayService` to
+`ObjectStoreBackend.readinessCheck`. `S3Backend` attaches it to the signed
+upstream `HEAD` request, applies it to every retry and backoff, and does not start
+an attempt after expiry. POSIX and test backends may complete synchronously, but
+must reject an already-expired readiness deadline.
+
+The transport owns exactly one application task for each accepted request and
+stores its cancellation handle for the lifetime of the channel request.
+Channel inactivity, transport timeout, handler removal, transport shutdown, and
+response-write failure cancel that task. Transport task cleanup releases only a
+shared-limiter permit it acquired; cancellation then unwinds the application
+task, whose readiness-gate cleanup releases the separate permit. Both owners use
+idempotent task-lifetime cleanup so cancellation before application entry or
+while awaiting upstream work cannot leak or double-release capacity.
+Cancellation must propagate through `GatewayService` and the S3 upstream client
+so that the connection or exchange is closed promptly; a disconnected client
+must not leave retry sleeps or signed upstream requests running.
+
+Admission and cancellation are validated at their owning boundaries:
+
+- A blocking readiness probe followed by client disconnect must observe
+  cancellation and release the readiness permit before another probe is admitted.
+- Readiness saturation must leave an authenticated object request eligible for
+  the shared limiter; readiness traffic alone cannot cause that request to
+  receive a limiter-generated `503`.
+- Classifier tests must cover disabled health routes, exact liveness and readiness
+  matches, `GET` and `HEAD`, nonempty queries, alternate methods, and path near
+  matches. A near match must acquire the shared limiter and follow
+  authentication; a carried-class mismatch must return the controlled invariant
+  failure without invoking health, authentication, or backend work; only an exact
+  health classification may bypass the shared limiter.
+- Timeout and disconnect tests must wait on explicit synchronization signals,
+  not timing-only sleeps, and must assert permit release as well as task
+  cancellation.
+- Health overload, expiry, and backend failure preserve the existing fixed
+  readiness body, headers, and `GET`/`HEAD` behavior without exposing upstream
+  details.
+
+This change is internal and adds no configuration surface. The dedicated
+readiness capacity remains fixed at one for Stage 1. Rollout requires the focused
+transport, integration, and S3 backend tests to pass before the complete security
+scan is rerun, including network-enabled dependency auditing.
+
 ## Domain Model
 
 All public protocols and DTOs are `Sendable`. Mutable shared state is isolated in
@@ -441,7 +520,9 @@ override upstream credentials, endpoint, region, bucket mapping, or TLS policy.
 Request and response bodies stream through bounded buffers. If either side slows,
 backpressure reaches the other side; the gateway does not accumulate the remainder
 of an object. Client cancellation cancels the upstream exchange. Connection pools
-and concurrent in-flight bytes are capped.
+and concurrent in-flight bytes are capped. Readiness uses the request-scoped
+absolute deadline described above; it cannot fall back to the configured upstream
+timeout or outlive the inbound request that initiated it.
 
 TLS certificate and hostname validation are mandatory outside explicit loopback
 development mode. Redirects are disabled unless the destination is pre-approved,
@@ -560,10 +641,14 @@ aggregated metrics remain release follow-up work.
   atomic replacement, process interruption, recovery, and external mutation.
 - S3 backend tests cover new request signing, credential separation, endpoint and
   region mismatch, TLS failure, redirect rejection, retry classification,
-  throttling, truncated XML, upstream error mapping, and backpressure.
+  throttling, truncated XML, upstream error mapping, backpressure, readiness
+  deadline propagation, and cancellation of a blocking readiness exchange.
 - HTTP compatibility tests exercise path and virtual-host addressing, CRUD, head,
   list pagination, metadata, ETags, checksums, single ranges, conditions, and
-  unsupported-operation responses using representative S3 clients.
+  unsupported-operation responses using representative S3 clients. Transport and
+  integration tests additionally prove that readiness saturation cannot consume
+  authenticated-request capacity and that disconnect releases readiness admission
+  promptly.
 - Multipart tests cover part ordering, limits, duplicate completion, abort,
   expiration, crash recovery, and no partial publication before the staged route
   is enabled.
