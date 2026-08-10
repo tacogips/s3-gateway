@@ -42,14 +42,14 @@ swift run swift-s3-gateway --version | tail -n 1 | grep -Fx "$version"
 Check the release plan:
 
 ```bash
-task build:homebrew-cask -- --dry-run darwin-arm64 darwin-x64
+mise run build:homebrew-cask -- --dry-run darwin-arm64 darwin-x64
 ```
 
 Build signed, notarized, and stapled DMGs:
 
 ```bash
 kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- \
-  task build:homebrew-cask -- darwin-arm64 darwin-x64
+  mise run build:homebrew-cask -- darwin-arm64 darwin-x64
 ```
 
 Expected outputs:
@@ -75,7 +75,7 @@ For a pushed `v<version>` tag:
 
 ```bash
 kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- \
-  task release:homebrew-cask-local -- v<version>
+  mise run release:homebrew-cask-local -- v<version>
 ```
 
 The wrapper checks the local and remote tag, verifies `VERSION`, uploads both
@@ -102,3 +102,12 @@ HOMEBREW_NO_GITHUB_API=1 brew audit --cask user/tap/swift-s3-gateway
 If `brew audit --online` fails with local GitHub credential errors, use
 `HOMEBREW_NO_GITHUB_API=1` and report that online audit was blocked by local
 credentials, not the Cask syntax.
+
+## Tap API Metadata Gate
+
+After pushing `Casks/swift-s3-gateway.rb`, require the tap's
+`update-api-metadata.yml` workflow to succeed for that commit. Verify the
+GitHub Raw `api/cask/swift-s3-gateway.json`: its `.version` must equal the
+release version and its `.ruby_source_checksum.sha256` must equal the SHA-256
+of the committed Cask. Do not consider the release complete while the endpoint
+is missing or stale.

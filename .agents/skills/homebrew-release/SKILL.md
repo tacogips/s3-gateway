@@ -1,6 +1,6 @@
 ---
 name: homebrew-release
-description: Use when building, validating, publishing, or tap-rendering Homebrew formula tarball releases for this Swift project, including scripts/build-homebrew-release.sh, scripts/render-homebrew-formula.sh, and task build:homebrew or homebrew:formula commands.
+description: Use when building, validating, publishing, or tap-rendering Homebrew formula tarball releases for this Swift project, including scripts/build-homebrew-release.sh, scripts/render-homebrew-formula.sh, and mise run build:homebrew or homebrew:formula commands.
 ---
 
 # Homebrew Release
@@ -39,23 +39,23 @@ contract.
 Build:
 
 ```bash
-task build
-task test
-task build:homebrew -- darwin-arm64 darwin-x64
+mise run build
+mise run test
+mise run build:homebrew -- darwin-arm64 darwin-x64
 ```
 
 Render locally:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-task homebrew:formula -- "$version"
+mise run homebrew:formula -- "$version"
 ```
 
 Render into the default sibling tap:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-task homebrew:tap-formula -- "$version"
+mise run homebrew:tap-formula -- "$version"
 ```
 
 For a custom tap path:
@@ -100,3 +100,12 @@ brew test user/tap/swift-s3-gateway
 
 If online audit fails because of local GitHub credentials or rate limits, run a
 non-online audit and report the limitation.
+
+## Tap API Metadata Gate
+
+After pushing `Formula/swift-s3-gateway.rb`, require the tap's
+`update-api-metadata.yml` workflow to succeed for that commit. Verify the
+GitHub Raw `api/formula/swift-s3-gateway.json`: its `.versions.stable` must
+equal the release version and its `.ruby_source_checksum.sha256` must equal the
+SHA-256 of the committed Formula. Do not consider the release complete while
+the endpoint is missing or stale.

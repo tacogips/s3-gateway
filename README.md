@@ -53,8 +53,7 @@ private test CA, starts the native-TLS gateway, and runs CRUD, range, LIST, and
 presigned-URL checks:
 
 ```bash
-nix shell nixpkgs#awscli2 nixpkgs#jq --command \
-  scripts/test-aws-cli-stage1.sh
+mise run test:aws-cli
 ```
 
 For an upstream S3 backend, HTTPS certificate verification is always enabled.
@@ -76,9 +75,9 @@ queries, bodies, or credential identifiers.
 ## Development
 
 ```bash
-nix develop
-task build
-task test
+mise install
+mise run build
+mise run test
 swift run swift-s3-gateway --help
 ```
 
@@ -98,19 +97,19 @@ needed, but use identifier-safe values such as `AppCore`, `AppCLI`, and
 Build local formula archives:
 
 ```bash
-task build:homebrew -- darwin-arm64 darwin-x64
+mise run build:homebrew -- darwin-arm64 darwin-x64
 ```
 
 Render a formula after both platform archives exist:
 
 ```bash
-task homebrew:formula -- 0.1.0
+mise run homebrew:formula -- 0.1.0
 ```
 
 Render directly into the default sibling tap checkout:
 
 ```bash
-task homebrew:tap-formula -- 0.1.0
+mise run homebrew:tap-formula -- 0.1.0
 ```
 
 Install from the tap after the formula is published:
@@ -128,27 +127,27 @@ Apple signing credentials must stay local and must not be committed.
 Check the build plan:
 
 ```bash
-task build:homebrew-cask -- --dry-run darwin-arm64 darwin-x64
+mise run build:homebrew-cask -- --dry-run darwin-arm64 darwin-x64
 ```
 
 Build with local signing credentials:
 
 ```bash
 kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- \
-  task build:homebrew-cask -- darwin-arm64 darwin-x64
+  mise run build:homebrew-cask -- darwin-arm64 darwin-x64
 ```
 
 Render a Cask:
 
 ```bash
-task homebrew:cask -- 0.1.0
+mise run homebrew:cask -- 0.1.0
 ```
 
 For a tagged release, build, upload, and render the tap Cask:
 
 ```bash
 kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- \
-  task release:homebrew-cask-local -- v0.1.0
+  mise run release:homebrew-cask-local -- v0.1.0
 ```
 
 See `packaging/homebrew/README.md` and `.agents/skills/` for release workflows.

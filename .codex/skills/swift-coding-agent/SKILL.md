@@ -74,8 +74,8 @@ Choose commands from project evidence:
 ```bash
 swift test
 swift build
-task test
-task build
+mise run test
+mise run build
 ```
 
 In final responses, report exact lint/build/test commands run and any commands

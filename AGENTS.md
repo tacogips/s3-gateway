@@ -16,22 +16,22 @@ You (the LLM model) must include a paraphrase or summary of the user's instructi
 
 ## Project Overview
 
-This is `swift-s3-gateway`, a Swift Package Manager project with a Nix development shell, go-task automation, Homebrew formula packaging, and optional signed Homebrew Cask packaging.
+This is `swift-s3-gateway`, a Swift Package Manager project with a mise-managed development environment and task automation, Homebrew formula packaging, and optional signed Homebrew Cask packaging.
 
 ## Development Environment
 
 - Language: Swift
 - Package manager: Swift Package Manager
-- Build automation: go-task
-- Environment manager: Nix flakes + direnv
-- Development shell: `nix develop` or direnv
+- Build automation: mise
+- Environment manager: mise
+- Tool setup: `mise install`
 
 ## Common Commands
 
 ```bash
-task build
-task test
-task lint
+mise run build
+mise run test
+mise run lint
 swift run swift-s3-gateway --help
 ```
 

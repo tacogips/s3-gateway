@@ -681,8 +681,8 @@ declared complete
 
 **Verification**:
 
-- `task lint`
-- `task test`
+- `mise run lint`
+- `mise run test`
 - `swift build`
 - `git diff --check`
 - `git status --short`
@@ -714,8 +714,8 @@ stage boundary:
 ```bash
 swift build
 swift test
-task lint
-task test
+mise run lint
+mise run test
 swift run swift-s3-gateway --help
 git diff --check
 git status --short
@@ -742,7 +742,7 @@ upstream TLS/retry behavior, and secret redaction.
 - [x] Pending user decisions are resolved or explicitly block the affected
   completion claim.
 - [x] Documentation and plan status match the implemented rollout stage.
-- [x] `swift build`, `swift test`, `task lint`, `task test`, `git diff --check`, and
+- [x] `swift build`, `swift test`, `mise run lint`, `mise run test`, `git diff --check`, and
   scope review pass before handoff.
 
 ## Risks
@@ -826,7 +826,7 @@ upstream TLS/retry behavior, and secret redaction.
   with full hostname verification, and a positive native-TLS upstream transport
   integration test plus wrong-host rejection. Updated the CLI/design/README and
   OSS benchmark harness documentation; the harness now records tool and operating
-  system versions. `task lint`, `task test`, and `task build` pass in the Nix
+  system versions. `mise run lint`, `mise run test`, and `mise run build` pass in the Nix
   development shell with 59 tests and zero lint findings. External benchmark and
   client evidence remains open because `aws` and `hyperfine` are unavailable.
 - 2026-07-23: Resolved the preceding tool/client blocker with reproducible Nix
@@ -849,7 +849,7 @@ upstream TLS/retry behavior, and secret redaction.
   concurrency counts plus optional target RSS sampling. A local smoke run passed
   sequential and two-client concurrent 64 MiB PUT/GET, HEAD, LIST, and RSS
   capture (23,408 KiB peak); it is not treated as a publishable comparison.
-  `task lint`, `task test`, and `task build` pass in `nix develop` with 74 tests
+  `mise run lint`, `mise run test`, and `mise run build` pass in `nix develop` with 74 tests
   and zero lint findings. `nix flake check --no-build`, shell syntax,
   `git diff --check`, file-size policy, and scoped Gitleaks scans also pass.
   Publishable VersityGW, S3Proxy, and SeaweedFS comparisons, larger-than-memory
@@ -875,8 +875,8 @@ upstream TLS/retry behavior, and secret redaction.
   publication, then completed a byte-verified 512 MiB TLS PUT/GET with 18,800 KiB
   peak gateway RSS. The stricter literal larger-than-available-memory exercise
   remains open because macOS rejected lowering `RLIMIT_AS`.
-- 2026-07-23: Final local source gates after these changes pass: `task lint`,
-  `task test`, and `task build` in `nix develop` with 83 tests and zero lint
+- 2026-07-23: Final local source gates after these changes pass: `mise run lint`,
+  `mise run test`, and `mise run build` in `nix develop` with 83 tests and zero lint
   findings. Focused recovery, deadline, virtual-host, controlled upstream TLS,
   AWS CLI, process-interruption, and bounded-RSS gates pass. Comparative
   VersityGW, S3Proxy, and SeaweedFS result sets remain external release evidence,
@@ -892,7 +892,7 @@ upstream TLS/retry behavior, and secret redaction.
   revocation checks; TLS 1.2 minimum, invalid key material, and controlled-restart
   certificate rotation; and rejection of cross-operation query fields and
   multipart subresources without silent downgrade. Strict SwiftLint reports zero
-  findings, all 104 tests pass, and `task build` succeeds in `nix develop`.
+  findings, all 104 tests pass, and `mise run build` succeeds in `nix develop`.
 - 2026-07-23: Repeated the native-TLS AWS CLI 2.35.11 black-box gate after the
   routing changes. A signed 1 GiB PUT killed after staging began recovered
   without partial publication; a byte-verified 512 MiB PUT/GET used 18,608 KiB
@@ -924,8 +924,8 @@ upstream TLS/retry behavior, and secret redaction.
   backends; shared authenticated capacity is never consumed or over-released by
   health traffic. The completed design and evidence are recorded in
   `impl-plans/completed/sec-triage-001-readiness-isolation.md`.
-- 2026-07-23: Final Stage 1 gates pass with 121 tests: `task lint`, `task test`,
-  `task build`, focused `SecurityRegressionTests`, `SecretRedactionTests`, and
+- 2026-07-23: Final Stage 1 gates pass with 121 tests: `mise run lint`, `mise run test`,
+  `mise run build`, focused `SecurityRegressionTests`, `SecretRedactionTests`, and
   `FaultInjectionTests`, native-TLS AWS CLI 2.35.11 compatibility, controlled
   upstream TLS, CLI help, `nix flake check --no-build`, shell syntax, JSON
   validation, `git diff --check`, and the under-1,000-line Swift policy. Scoped

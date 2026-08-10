@@ -178,7 +178,7 @@ must reject an already-expired readiness deadline.
 The transport owns exactly one application task for each accepted request and
 stores its cancellation handle for the lifetime of the channel request.
 Channel inactivity, transport timeout, handler removal, transport shutdown, and
-response-write failure cancel that task. Transport task cleanup releases only a
+response-write failure cancel that task. Transport mise run cleanup releases only a
 shared-limiter permit it acquired; cancellation then unwinds the application
 task, whose readiness-gate cleanup releases the separate permit. Both owners use
 idempotent task-lifetime cleanup so cancellation before application entry or

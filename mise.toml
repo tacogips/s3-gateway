@@ -1,0 +1,119 @@
+min_version = "2026.8.3"
+
+[[hooks.enter]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko --path "$MISE_PROJECT_ROOT" hook enter bash)"
+fi
+'''
+
+[[hooks.leave]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko hook leave bash)"
+fi
+'''
+
+[tools]
+swift = "6.3.3"
+swiftlint = "latest"
+gitleaks = "latest"
+github-cli = "latest"
+awscli = "latest"
+jq = "latest"
+
+[tasks."default"]
+description = "Show available tasks"
+run = '''
+mise tasks ls
+'''
+
+[tasks."build"]
+description = "Build the Swift package"
+run = '''
+swift build
+'''
+
+[tasks."run"]
+description = "Run the executable"
+run = '''
+swift run swift-s3-gateway "$@"
+'''
+
+[tasks."test"]
+description = "Run Swift tests"
+run = '''
+swift test
+'''
+
+[tasks."test:aws-cli"]
+description = "Run the isolated AWS CLI compatibility gate"
+run = "scripts/test-aws-cli-stage1.sh"
+
+[tasks."clean"]
+description = "Clean SwiftPM and release artifacts"
+run = '''
+rm -rf .build dist release
+'''
+
+[tasks."lint"]
+description = "Run SwiftLint when available"
+run = '''
+swiftlint
+'''
+
+[tasks."build:homebrew"]
+description = "Build standalone Homebrew formula archives for the current platform, or pass targets after --"
+run = '''
+scripts/build-homebrew-release.sh "$@"
+'''
+
+[tasks."homebrew:formula"]
+description = "Render Formula/swift-s3-gateway.rb from dist/homebrew checksums"
+run = '''
+scripts/render-homebrew-formula.sh "$@"
+'''
+
+[tasks."homebrew:tap-formula"]
+description = "Render the formula into the default sibling Homebrew tap checkout"
+run = '''
+set -euo pipefail
+if [ -z "$*" ]; then
+  echo "usage: mise run homebrew:tap-formula -- <version>" >&2
+  exit 2
+fi
+scripts/render-homebrew-formula.sh "$*" "../homebrew-tap/Formula/swift-s3-gateway.rb"
+
+'''
+
+[tasks."build:homebrew-cask"]
+description = "Build signed and notarized Homebrew Cask DMGs, or pass targets after --"
+run = '''
+scripts/build-homebrew-cask-release.sh "$@"
+'''
+
+[tasks."homebrew:cask"]
+description = "Render Casks/swift-s3-gateway.rb from dist/homebrew-cask checksums"
+run = '''
+scripts/render-homebrew-cask.sh "$@"
+'''
+
+[tasks."homebrew:tap-cask"]
+description = "Render the cask into the default sibling Homebrew tap checkout"
+run = '''
+set -euo pipefail
+if [ -z "$*" ]; then
+  echo "usage: mise run homebrew:tap-cask -- <version>" >&2
+  exit 2
+fi
+scripts/render-homebrew-cask.sh "$*" "../homebrew-tap/Casks/swift-s3-gateway.rb"
+
+'''
+
+[tasks."release:homebrew-cask-local"]
+description = "Build, notarize, upload, and render the sibling tap cask for a v<version> tag"
+run = '''
+scripts/release-homebrew-cask-local.sh "$@"
+'''

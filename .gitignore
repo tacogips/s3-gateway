@@ -9,13 +9,9 @@ release/
 *.xcodeproj/
 *.xcworkspace/
 
-# Nix and local environment files
+# Local environment files
 .pre-commit-config.yaml
-result
-result-*
-**/.direnv
 **/.env
-**/.envrc.private*
 **/*.private*
 
 # IDE and OS metadata
@@ -32,3 +28,5 @@ temp/
 .cache/
 logs/
 *.log
+
+mise.local.toml

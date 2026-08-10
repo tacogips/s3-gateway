@@ -70,6 +70,6 @@ swift test --filter MultipartCompatibilityTests
 swift test --filter MultipartRoutingTests
 swift test --filter MultipartResponseEncoderTests
 swift test --filter MultipartGatewayIntegrationTests
-task lint
-task test
+mise run lint
+mise run test
 ```

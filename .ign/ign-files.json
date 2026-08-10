@@ -2,6 +2,7 @@
   "files": [
     ".agents/skills/apple-notarization-setup/SKILL.md",
     ".agents/skills/homebrew-release/SKILL.md",
+    ".agents/skills/ios-ipados-app-deploy/SKILL.md",
     ".agents/skills/macos-cask-release/SKILL.md",
     ".codex/skills/swift-coding-agent/SKILL.md",
     ".envrc",
@@ -30,6 +31,7 @@
     "impl-plans/active/.gitkeep",
     "impl-plans/completed/.gitkeep",
     "impl-plans/templates/plan-template.md",
+    "mise.toml",
     "packaging/homebrew/README.md",
     "scripts/build-homebrew-cask-release.sh",
     "scripts/build-homebrew-release.sh",

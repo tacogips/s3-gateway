@@ -4,12 +4,12 @@
     "path": "swift-v1",
     "ref": "main"
   },
-  "hash": "d19207b9d27f4351c74b8fb80c2427dea53986fac39d6dae098b81e0fd740464",
+  "hash": "3056b11a0c821af92802b6ca9b5d1df57e62e69ecac5f911d4e7a0b7773901ba",
   "metadata": {
-    "generated_at": "2026-07-21T11:49:43.073742+09:00",
-    "generated_by": "ign checkout",
+    "generated_at": "2026-08-10T20:14:15.808401+09:00",
+    "generated_by": "ign update",
     "template_name": "swift-v1",
     "template_version": "1.0.0",
-    "ign_version": "0.1.18"
+    "ign_version": "0.1.20"
   }
 }
