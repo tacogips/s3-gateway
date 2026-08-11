@@ -9,7 +9,7 @@ description: Use when implementing, refactoring, reviewing, or maintaining Swift
 
 1. Inspect the project before editing:
    - Read `Package.swift`, nearby source, tests, `.swiftlint.yml` if present,
-     `Taskfile.yml`, and CI workflows if present.
+     `mise.toml`, and CI workflows if present.
    - Match local naming, access control, dependency injection, error handling,
      concurrency style, and formatting.
    - Use `rg --files -g '*.swift'` and `wc -l` to identify Swift files over
@@ -44,10 +44,10 @@ Always try to run SwiftLint for Swift code changes:
 swiftlint
 ```
 
-When using the Nix shell on macOS with Xcode's Swift toolchain, prefer:
+When using mise on macOS with Xcode's Swift toolchain, prefer:
 
 ```bash
-nix develop -c bash -lc 'export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer; export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk; export TOOLCHAINS=com.apple.dt.toolchain.XcodeDefault; export PATH=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:$PATH; swiftlint'
+mise exec -- bash -lc 'export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer; export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk; export TOOLCHAINS=com.apple.dt.toolchain.XcodeDefault; export PATH=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:$PATH; swiftlint'
 ```
 
 If SwiftLint is unavailable, report that clearly and still run available Swift

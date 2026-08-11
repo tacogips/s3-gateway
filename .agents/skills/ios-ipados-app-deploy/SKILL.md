@@ -82,6 +82,13 @@ Required local signing state:
 - App ID/provisioning profile for the bundle ID.
 - Physical iPhone/iPad trusted by the Mac for device builds and install checks.
 
+When an App ID capability or container assignment changes, treat every affected
+provisioning profile as stale. Regenerate, download, install, and inspect the
+replacement profile before archiving. Fail closed if the app's signed
+entitlements request a capability that the selected profile does not contain.
+Keep profile contents, UUIDs, and downloaded profile files out of Git and
+release evidence.
+
 Check identities without exposing secrets:
 
 ```bash
@@ -226,7 +233,10 @@ settled. Use:
 - Access: full access unless the user asks for limited access.
 
 After the app record exists, validate and upload the IPA using the repo's
-preferred uploader, Xcode Organizer, Transporter, or `altool` when available:
+preferred uploader, Xcode Organizer, Transporter, or an App Store Connect API
+key workflow. Do not use deprecated `altool` as the primary release path;
+retain it only for repositories that still require it for comparison or
+transport diagnosis:
 
 ```bash
 kinko exec --env APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- bash -lc '
@@ -250,6 +260,21 @@ xcrun altool --upload-app \
 
 If validation says it cannot determine the app from the bundle ID, verify that
 the App Store Connect app record exists for that bundle ID and team.
+
+An upload command returning successfully proves only that delivery was
+submitted unless it explicitly waits for processing. For deploy-to-TestFlight
+requests, require all of these outcomes for the exact version and build:
+
+- package and binary upload completed;
+- App Store Connect processing completed successfully;
+- the build was assigned to the intended internal group, or automatic internal
+  distribution made it available;
+- the processed version/build is newer than every previously uploaded build.
+
+If App Store Connect reports that a bundle version must be higher, consider the
+rejected number consumed even when it is not visible in TestFlight. Increment
+the project build number, rebuild and re-export the IPA, and upload the new
+artifact. Do not repeatedly retry the consumed build number.
 
 After upload:
 

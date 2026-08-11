@@ -103,9 +103,10 @@ non-online audit and report the limitation.
 
 ## Tap API Metadata Gate
 
-After pushing `Formula/swift-s3-gateway.rb`, require the tap's
-`update-api-metadata.yml` workflow to succeed for that commit. Verify the
-GitHub Raw `api/formula/swift-s3-gateway.json`: its `.versions.stable` must
-equal the release version and its `.ruby_source_checksum.sha256` must equal the
-SHA-256 of the committed Formula. Do not consider the release complete while
-the endpoint is missing or stale.
+After pushing the tap Formula, require the tap's `update-api-metadata.yml`
+workflow to succeed for that commit. Derive the GitHub tap repository from
+`user/tap`, wait for the matching workflow run, then
+verify `api/formula/swift-s3-gateway.json` from
+GitHub Raw. The JSON release is incomplete unless `.versions.stable` equals the
+release version and `.ruby_source_checksum.sha256` equals the SHA-256 of the
+committed Formula Ruby file.
