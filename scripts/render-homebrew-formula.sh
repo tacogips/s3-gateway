@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 artifact_name="s3-gateway"
 product="s3-gateway"
+repository_url="https://github.com/tacogips/s3-gateway"
 
 usage() {
   cat <<EOF
@@ -56,7 +57,7 @@ main() {
   version="$1"
   output="${2:-$repo_root/Formula/$artifact_name.rb}"
   release_dir="${RELEASE_DIR:-$repo_root/dist/homebrew}"
-  release_base_url="${RELEASE_BASE_URL:-https://github.com/user/repo/releases/download/v$version}"
+  release_base_url="${RELEASE_BASE_URL:-$repository_url/releases/download/v$version}"
 
   local darwin_arm64_sha darwin_x64_sha
   darwin_arm64_sha="$(sha_for_target "$version" darwin-arm64 "$release_dir")"
@@ -64,9 +65,9 @@ main() {
 
   mkdir -p "$(dirname "$output")"
   cat > "$output" <<EOF
-class App < Formula
-  desc "A Swift command line tool"
-  homepage "https://github.com/user/repo"
+class S3Gateway < Formula
+  desc "Bounded SigV4-authenticated S3 gateway for POSIX and upstream S3 storage"
+  homepage "$repository_url"
   version "$version"
   license "MIT"
 
