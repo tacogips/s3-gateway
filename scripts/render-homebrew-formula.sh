@@ -68,7 +68,6 @@ main() {
 class S3Gateway < Formula
   desc "Bounded SigV4-authenticated S3 gateway for POSIX and upstream S3 storage"
   homepage "$repository_url"
-  version "$version"
   license "MIT"
 
   livecheck do
