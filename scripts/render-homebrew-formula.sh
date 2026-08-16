@@ -77,10 +77,10 @@ class S3Gateway < Formula
 
   on_macos do
     if Hardware::CPU.arm?
-      url "$release_base_url/$artifact_name-$version-darwin-arm64.tar.gz"
+      url "$release_base_url/$artifact_name-$version-darwin-arm64.tar.gz", tag: "v$version"
       sha256 "$darwin_arm64_sha"
     else
-      url "$release_base_url/$artifact_name-$version-darwin-x64.tar.gz"
+      url "$release_base_url/$artifact_name-$version-darwin-x64.tar.gz", tag: "v$version"
       sha256 "$darwin_x64_sha"
     end
   end
