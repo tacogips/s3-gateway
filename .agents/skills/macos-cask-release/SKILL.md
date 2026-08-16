@@ -9,7 +9,7 @@ Use this skill for Cask releases installed with:
 
 ```bash
 brew tap user/tap
-brew install --cask swift-s3-gateway
+brew install --cask s3-gateway
 ```
 
 Use `.agents/skills/homebrew-release/SKILL.md` for unsigned Formula tarballs.
@@ -36,7 +36,7 @@ Check version alignment:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-swift run swift-s3-gateway --version | tail -n 1 | grep -Fx "$version"
+swift run s3-gateway --version | tail -n 1 | grep -Fx "$version"
 ```
 
 Check the release plan:
@@ -55,18 +55,18 @@ kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID --
 Expected outputs:
 
 ```text
-dist/homebrew-cask/swift-s3-gateway-<version>-darwin-arm64.dmg
-dist/homebrew-cask/swift-s3-gateway-<version>-darwin-x64.dmg
+dist/homebrew-cask/s3-gateway-<version>-darwin-arm64.dmg
+dist/homebrew-cask/s3-gateway-<version>-darwin-x64.dmg
 ```
 
 Validate:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-arm64.dmg"
-/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-x64.dmg"
-spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-arm64.dmg"
-spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-x64.dmg"
+/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/s3-gateway-${version}-darwin-arm64.dmg"
+/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/s3-gateway-${version}-darwin-x64.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/s3-gateway-${version}-darwin-arm64.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/s3-gateway-${version}-darwin-x64.dmg"
 ```
 
 ## Tagged Release
@@ -80,23 +80,23 @@ kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID --
 
 The wrapper checks the local and remote tag, verifies `VERSION`, uploads both
 DMGs to `user/repo`, and renders
-`../homebrew-tap/Casks/swift-s3-gateway.rb`.
+`../homebrew-tap/Casks/s3-gateway.rb`.
 
 After reviewing the rendered tap Cask:
 
 ```bash
 cd ../homebrew-tap
-git add Casks/swift-s3-gateway.rb README.md
+git add Casks/s3-gateway.rb README.md
 git diff --staged --stat
-git commit -m "chore: release swift-s3-gateway <version>"
+git commit -m "chore: release s3-gateway <version>"
 git push origin main
 ```
 
 ## Tap Verification
 
 ```bash
-brew fetch --cask user/tap/swift-s3-gateway
-HOMEBREW_NO_GITHUB_API=1 brew audit --cask user/tap/swift-s3-gateway
+brew fetch --cask user/tap/s3-gateway
+HOMEBREW_NO_GITHUB_API=1 brew audit --cask user/tap/s3-gateway
 ```
 
 If `brew audit --online` fails with local GitHub credential errors, use
@@ -108,7 +108,7 @@ credentials, not the Cask syntax.
 After pushing the tap Cask, require the tap's `update-api-metadata.yml`
 workflow to succeed for that commit. Derive the GitHub tap repository from
 `user/tap`, wait for the matching workflow run, then
-verify `api/cask/swift-s3-gateway.json` from GitHub
+verify `api/cask/s3-gateway.json` from GitHub
 Raw. The JSON release is incomplete unless `.version` equals the release
 version and `.ruby_source_checksum.sha256` equals the SHA-256 of the committed
 Cask Ruby file.

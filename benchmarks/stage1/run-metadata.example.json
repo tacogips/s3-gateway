@@ -1,5 +1,5 @@
 {
-  "target": "swift-s3-gateway-shared",
+  "target": "s3-gateway-shared",
   "version": "replace-me",
   "sourceRevisionOrImageDigest": "replace-me",
   "storageModel": "direct-local-directory",

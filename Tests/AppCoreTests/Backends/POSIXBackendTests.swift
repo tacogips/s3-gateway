@@ -51,9 +51,9 @@ import Testing
   let fixture = try POSIXFixture()
   defer { fixture.remove() }
   let staging = fixture.sidecarURL
-    .appendingPathComponent(".swift-s3-gateway-staging/my-bucket", isDirectory: true)
+    .appendingPathComponent(".s3-gateway-staging/my-bucket", isDirectory: true)
   try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-  let abandoned = staging.appendingPathComponent(".swift-s3-gateway-\(UUID().uuidString).tmp")
+  let abandoned = staging.appendingPathComponent(".s3-gateway-\(UUID().uuidString).tmp")
   try Data("partial".utf8).write(to: abandoned)
   _ = try fixture.makeBackend(policy: .sharedLocalDirectory)
   #expect(!FileManager.default.fileExists(atPath: abandoned.path))
@@ -298,7 +298,7 @@ import Testing
   }
   let staging = fixture.sidecarURL
     .appendingPathComponent(
-      ".swift-s3-gateway-staging/my-bucket",
+      ".s3-gateway-staging/my-bucket",
       isDirectory: true
     )
   #expect(try FileManager.default.contentsOfDirectory(atPath: staging.path).isEmpty)
@@ -648,7 +648,7 @@ import Testing
     )
   }
   let staging = fixture.sidecarURL
-    .appendingPathComponent(".swift-s3-gateway-staging/my-bucket", isDirectory: true)
+    .appendingPathComponent(".s3-gateway-staging/my-bucket", isDirectory: true)
   #expect(try FileManager.default.contentsOfDirectory(atPath: staging.path).isEmpty)
 }
 

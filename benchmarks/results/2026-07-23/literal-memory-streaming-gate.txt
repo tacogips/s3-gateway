@@ -13,7 +13,7 @@ REQUEST_TIMEOUT_SECONDS=3600 \
 STAGE1_STREAMING_OBJECT_MIB=33792 \
 STAGE1_STREAMING_DISCARD_DOWNLOAD=1 \
 STAGE1_REQUIRE_OBJECT_LARGER_THAN_PHYSICAL_MEMORY=1 \
-GATEWAY_BINARY=.build/release/swift-s3-gateway \
+GATEWAY_BINARY=.build/release/s3-gateway \
 scripts/test-aws-cli-stage1.sh
 
 The harness asserted the object size exceeded `sysctl -n hw.memsize` before the

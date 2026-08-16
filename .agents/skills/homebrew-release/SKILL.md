@@ -9,7 +9,7 @@ Use this skill for Formula releases installed with:
 
 ```bash
 brew tap user/tap
-brew install swift-s3-gateway
+brew install s3-gateway
 ```
 
 Use `.agents/skills/macos-cask-release/SKILL.md` for signed and notarized Cask
@@ -28,8 +28,8 @@ The default Swift formula contract is macOS-only:
 
 | Homebrew platform | Release asset |
 | --- | --- |
-| macOS Apple Silicon | `swift-s3-gateway-<version>-darwin-arm64.tar.gz` |
-| macOS Intel | `swift-s3-gateway-<version>-darwin-x64.tar.gz` |
+| macOS Apple Silicon | `s3-gateway-<version>-darwin-arm64.tar.gz` |
+| macOS Intel | `s3-gateway-<version>-darwin-x64.tar.gz` |
 
 Do not add Linux assets unless the project has a reviewed Swift Linux runtime
 contract.
@@ -62,7 +62,7 @@ For a custom tap path:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-scripts/render-homebrew-formula.sh "$version" /path/to/homebrew-tap/Formula/swift-s3-gateway.rb
+scripts/render-homebrew-formula.sh "$version" /path/to/homebrew-tap/Formula/s3-gateway.rb
 ```
 
 ## Publishing Notes
@@ -80,8 +80,8 @@ If publishing is explicitly requested:
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
 gh release upload "v${version}" \
-  "dist/homebrew/swift-s3-gateway-${version}-darwin-arm64.tar.gz" \
-  "dist/homebrew/swift-s3-gateway-${version}-darwin-x64.tar.gz" \
+  "dist/homebrew/s3-gateway-${version}-darwin-arm64.tar.gz" \
+  "dist/homebrew/s3-gateway-${version}-darwin-x64.tar.gz" \
   --repo user/repo \
   --clobber
 ```
@@ -91,11 +91,11 @@ gh release upload "v${version}" \
 From the tap checkout:
 
 ```bash
-ruby -c Formula/swift-s3-gateway.rb
-brew audit --strict swift-s3-gateway || brew audit --strict --formula swift-s3-gateway
-brew install user/tap/swift-s3-gateway
-swift-s3-gateway --version
-brew test user/tap/swift-s3-gateway
+ruby -c Formula/s3-gateway.rb
+brew audit --strict s3-gateway || brew audit --strict --formula s3-gateway
+brew install user/tap/s3-gateway
+s3-gateway --version
+brew test user/tap/s3-gateway
 ```
 
 If online audit fails because of local GitHub credentials or rate limits, run a
@@ -106,7 +106,7 @@ non-online audit and report the limitation.
 After pushing the tap Formula, require the tap's `update-api-metadata.yml`
 workflow to succeed for that commit. Derive the GitHub tap repository from
 `user/tap`, wait for the matching workflow run, then
-verify `api/formula/swift-s3-gateway.json` from
+verify `api/formula/s3-gateway.json` from
 GitHub Raw. The JSON release is incomplete unless `.versions.stable` equals the
 release version and `.ruby_source_checksum.sha256` equals the SHA-256 of the
 committed Formula Ruby file.

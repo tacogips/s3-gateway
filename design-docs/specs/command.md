@@ -7,10 +7,10 @@ Implemented for Stage 1
 ## Current CLI
 
 ```text
-swift-s3-gateway --help
-swift-s3-gateway --version
-swift-s3-gateway serve --config <configuration.json>
-swift-s3-gateway serve <configuration.json>
+s3-gateway --help
+s3-gateway --version
+s3-gateway serve --config <configuration.json>
+s3-gateway serve <configuration.json>
 ```
 
 `serve` loads one JSON configuration, validates credentials and the selected

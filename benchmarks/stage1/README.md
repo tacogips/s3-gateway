@@ -3,7 +3,7 @@
 This harness records comparable client-visible timings without treating unlike
 storage models as equivalent. Run it separately against:
 
-- `swift-s3-gateway` `sharedLocalDirectory` on a local filesystem;
+- `s3-gateway` `sharedLocalDirectory` on a local filesystem;
 - VersityGW's direct POSIX backend on the same filesystem and object tree;
 - S3Proxy `filesystem-nio2` on the same filesystem and an isolated tree;
 - SeaweedFS S3 backed by a filer, labeled as filer-backed rather than direct
@@ -19,7 +19,7 @@ The target bucket must already exist. Credentials are inherited by the AWS CLI:
 ```bash
 AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... \
 S3_ENDPOINT=https://127.0.0.1:8443 S3_BUCKET=benchmark \
-TARGET_LABEL=swift-s3-gateway-shared \
+TARGET_LABEL=s3-gateway-shared \
 scripts/benchmark-s3-stage1.sh benchmarks/results/swift-shared
 ```
 

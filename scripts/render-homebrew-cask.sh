@@ -3,8 +3,8 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-artifact_name="swift-s3-gateway"
-product="swift-s3-gateway"
+artifact_name="s3-gateway"
+product="s3-gateway"
 
 usage() {
   cat <<EOF
@@ -63,7 +63,7 @@ main() {
 
   mkdir -p "$(dirname "$output")"
   cat > "$output" <<EOF
-cask "swift-s3-gateway" do
+cask "s3-gateway" do
   version "$version"
   arch arm: "darwin-arm64", intel: "darwin-x64"
 
@@ -72,7 +72,7 @@ cask "swift-s3-gateway" do
 
   url "$release_base_url/$artifact_name-#{version}-#{arch}.dmg",
       verified: "github.com/user/repo/releases/download/"
-  name "swift-s3-gateway"
+  name "s3-gateway"
   desc "A Swift command line tool"
   homepage "https://github.com/user/repo"
 

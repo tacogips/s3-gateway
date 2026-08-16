@@ -97,7 +97,7 @@ struct POSIXMetadataStore: Sendable {
 
   func recoverPendingCommits(maximumRecords: Int = 10_000) throws {
     let root = mapper.sidecarURL
-      .appendingPathComponent(".swift-s3-gateway-commits", isDirectory: true)
+      .appendingPathComponent(".s3-gateway-commits", isDirectory: true)
     guard FileManager.default.fileExists(atPath: root.path) else { return }
     guard let enumerator = FileManager.default.enumerator(
       at: root,

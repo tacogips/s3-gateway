@@ -1,4 +1,4 @@
-# swift-s3-gateway
+# s3-gateway
 
 A bounded, SigV4-authenticated S3 gateway written in Swift. It can expose an
 approved local directory tree as S3 objects or forward requests to another S3
@@ -10,7 +10,7 @@ The production listener requires native TLS. Plain HTTP is accepted only when
 `developmentPlaintext` is true and the listener is bound to loopback.
 
 ```bash
-swift run swift-s3-gateway serve --config config-examples/gateway-posix-shared.json
+swift run s3-gateway serve --config config-examples/gateway-posix-shared.json
 ```
 
 The example uses absolute deployment paths that must be adjusted before use.
@@ -78,14 +78,14 @@ queries, bodies, or credential identifiers.
 mise install
 mise run build
 mise run test
-swift run swift-s3-gateway --help
+swift run s3-gateway --help
 ```
 
 The package uses Swift Package Manager with:
 
 - Library target: `AppCore`
 - Executable target: `AppCLI`
-- Installed executable: `swift-s3-gateway`
+- Installed executable: `s3-gateway`
 
 Swift target names and type names must be valid Swift identifiers. If the project
 name contains hyphens, keep `PROJECT_NAME` and `EXECUTABLE_NAME` hyphenated as
@@ -116,7 +116,7 @@ Install from the tap after the formula is published:
 
 ```bash
 brew tap user/tap
-brew install swift-s3-gateway
+brew install s3-gateway
 ```
 
 ## Homebrew Cask

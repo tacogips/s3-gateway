@@ -44,15 +44,15 @@ import Testing
 @Test func healthPathsMustBeDistinctAbsolutePaths() throws {
   var configuration = makeConfiguration()
   configuration.health = HealthEndpointConfiguration(
-    livenessPath: "/.well-known/swift-s3-gateway/health",
-    readinessPath: "/.well-known/swift-s3-gateway/health"
+    livenessPath: "/.well-known/s3-gateway/health",
+    readinessPath: "/.well-known/s3-gateway/health"
   )
   #expect(throws: ConfigurationError.self) {
     _ = try configuration.validated(fileSystem: AcceptingFileSystemInspector())
   }
   configuration.health = HealthEndpointConfiguration(
     livenessPath: "health/live",
-    readinessPath: "/.well-known/swift-s3-gateway/ready"
+    readinessPath: "/.well-known/s3-gateway/ready"
   )
   #expect(throws: ConfigurationError.self) {
     _ = try configuration.validated(fileSystem: AcceptingFileSystemInspector())
@@ -82,7 +82,7 @@ import Testing
   let configuration = try ConfigurationLoader.loadJSON(
     at: repository.appendingPathComponent("config-examples/gateway-posix-shared.json").path
   )
-  #expect(configuration.health?.readinessPath == "/.well-known/swift-s3-gateway/ready")
+  #expect(configuration.health?.readinessPath == "/.well-known/s3-gateway/ready")
   #expect(configuration.telemetry?.enabled == true)
   guard case .posix(let posix) = configuration.backend else {
     Issue.record("Expected the example to select the POSIX backend")
@@ -110,7 +110,7 @@ import Testing
   #expect(s3.endpoint.absoluteString == "https://s3.us-east-1.amazonaws.com")
   #expect(s3.region == "us-east-1")
   #expect(s3.bucketMappings["public-files"] == "company-public-files")
-  #expect(s3.stagingDirectory == "/var/lib/swift-s3-gateway/staging")
+  #expect(s3.stagingDirectory == "/var/lib/s3-gateway/staging")
 }
 
 @Test func upstreamPrivateCATrustPathMustBeAbsolute() throws {

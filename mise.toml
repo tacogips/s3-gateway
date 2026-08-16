@@ -39,7 +39,7 @@ swift build
 [tasks."run"]
 description = "Run the executable"
 run = '''
-swift run swift-s3-gateway "$@"
+swift run s3-gateway "$@"
 '''
 
 [tasks."test"]
@@ -71,7 +71,7 @@ scripts/build-homebrew-release.sh "$@"
 '''
 
 [tasks."homebrew:formula"]
-description = "Render Formula/swift-s3-gateway.rb from dist/homebrew checksums"
+description = "Render Formula/s3-gateway.rb from dist/homebrew checksums"
 run = '''
 scripts/render-homebrew-formula.sh "$@"
 '''
@@ -84,7 +84,7 @@ if [ -z "$*" ]; then
   echo "usage: mise run homebrew:tap-formula -- <version>" >&2
   exit 2
 fi
-scripts/render-homebrew-formula.sh "$*" "../homebrew-tap/Formula/swift-s3-gateway.rb"
+scripts/render-homebrew-formula.sh "$*" "../homebrew-tap/Formula/s3-gateway.rb"
 
 '''
 
@@ -95,7 +95,7 @@ scripts/build-homebrew-cask-release.sh "$@"
 '''
 
 [tasks."homebrew:cask"]
-description = "Render Casks/swift-s3-gateway.rb from dist/homebrew-cask checksums"
+description = "Render Casks/s3-gateway.rb from dist/homebrew-cask checksums"
 run = '''
 scripts/render-homebrew-cask.sh "$@"
 '''
@@ -108,7 +108,7 @@ if [ -z "$*" ]; then
   echo "usage: mise run homebrew:tap-cask -- <version>" >&2
   exit 2
 fi
-scripts/render-homebrew-cask.sh "$*" "../homebrew-tap/Casks/swift-s3-gateway.rb"
+scripts/render-homebrew-cask.sh "$*" "../homebrew-tap/Casks/s3-gateway.rb"
 
 '''
 

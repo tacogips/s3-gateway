@@ -116,8 +116,8 @@ public struct HealthEndpointConfiguration: Codable, Equatable, Sendable {
   public let readinessPath: String
 
   public init(
-    livenessPath: String = "/.well-known/swift-s3-gateway/live",
-    readinessPath: String = "/.well-known/swift-s3-gateway/ready"
+    livenessPath: String = "/.well-known/s3-gateway/live",
+    readinessPath: String = "/.well-known/s3-gateway/ready"
   ) {
     self.livenessPath = livenessPath
     self.readinessPath = readinessPath
@@ -125,8 +125,8 @@ public struct HealthEndpointConfiguration: Codable, Equatable, Sendable {
 
   func validate() throws {
     for (field, path) in [("livenessPath", livenessPath), ("readinessPath", readinessPath)] {
-      guard path.hasPrefix("/.well-known/swift-s3-gateway/"),
-            path.count > "/.well-known/swift-s3-gateway/".count,
+      guard path.hasPrefix("/.well-known/s3-gateway/"),
+            path.count > "/.well-known/s3-gateway/".count,
             !path.contains("?"),
             !path.contains("#") else {
         throw ConfigurationError.invalid(field: "health.\(field)", reason: "must use the reserved health prefix")

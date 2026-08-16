@@ -8,7 +8,7 @@ import Testing
 
 @Test func commandReportsUsage() throws {
   let command = AppCommand(arguments: ["--help"])
-  #expect(try command.run().contains("Usage: swift-s3-gateway"))
+  #expect(try command.run().contains("Usage: s3-gateway"))
 }
 
 @Test func commandRejectsUnknownFlags() throws {

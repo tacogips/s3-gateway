@@ -539,7 +539,7 @@ TASK-010, TASK-011
 
 - `swift test --filter ServerLifecycleTests`
 - `swift test --filter TelemetryTests`
-- `swift run swift-s3-gateway --help`
+- `swift run s3-gateway --help`
 
 ### TASK-013: Prove Stage 1 compatibility end to end
 
@@ -716,7 +716,7 @@ swift build
 swift test
 mise run lint
 mise run test
-swift run swift-s3-gateway --help
+swift run s3-gateway --help
 git diff --check
 git status --short
 ```
@@ -913,7 +913,7 @@ upstream TLS/retry behavior, and secret redaction.
   `FaultInjectionTests` passes with recoverable or rolled-back state.
 - 2026-07-23: Proved literal bounded streaming with a signed 33,792 MiB PUT and
   complete GET on a 32 GiB host; gateway RSS peaked at 16,048 KiB. Retained
-  reproducible comparative results for swift-s3-gateway 0.1.0, VersityGW 1.7.0,
+  reproducible comparative results for s3-gateway 0.1.0, VersityGW 1.7.0,
   S3Proxy 3.3.0, and SeaweedFS 4.40 under
   `benchmarks/results/2026-07-23/`, including exact revisions, storage-model
   labels, raw Hyperfine samples, environment data, and RSS.

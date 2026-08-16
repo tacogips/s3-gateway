@@ -3,13 +3,13 @@
 import PackageDescription
 
 let package = Package(
-  name: "swift-s3-gateway",
+  name: "s3-gateway",
   platforms: [
     .macOS(.v14)
   ],
   products: [
     .library(name: "AppCore", targets: ["AppCore"]),
-    .executable(name: "swift-s3-gateway", targets: ["AppCLI"])
+    .executable(name: "s3-gateway", targets: ["AppCLI"])
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-nio.git", from: "2.99.0"),

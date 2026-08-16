@@ -6,7 +6,7 @@ Stage 1 implemented; release evidence in progress
 
 ## Overview
 
-`swift-s3-gateway` is a Swift Package Manager project that will expose a bounded
+`s3-gateway` is a Swift Package Manager project that will expose a bounded
 S3-compatible HTTP service and route object operations to a configured storage
 backend. The detailed protocol, security, backend, and rollout design is defined
 in [S3 Gateway Design](s3-gateway-design.md).

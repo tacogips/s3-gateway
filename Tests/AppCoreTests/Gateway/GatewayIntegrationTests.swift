@@ -46,7 +46,7 @@ import Testing
   let healthResponse = await application.handle(
     HTTPTransportRequest(
       method: "GET",
-      rawPath: "/.well-known/swift-s3-gateway/ready",
+      rawPath: "/.well-known/s3-gateway/ready",
       rawQuery: "",
       headers: [:],
       body: ObjectBodyStream(data: Data()),
@@ -94,7 +94,7 @@ import Testing
   let response = await application.handle(
     HTTPTransportRequest(
       method: "GET",
-      rawPath: "/.well-known/swift-s3-gateway/ready",
+      rawPath: "/.well-known/s3-gateway/ready",
       rawQuery: "",
       headers: [:],
       body: ObjectBodyStream(data: Data()),
@@ -132,7 +132,7 @@ import Testing
   )
   let readinessRequest = HTTPTransportRequest(
     method: "GET",
-    rawPath: "/.well-known/swift-s3-gateway/ready",
+    rawPath: "/.well-known/s3-gateway/ready",
     rawQuery: "",
     headers: [:],
     body: ObjectBodyStream(data: Data()),
@@ -189,7 +189,7 @@ import Testing
   let response = await application.handle(
     HTTPTransportRequest(
       method: "GET",
-      rawPath: "/.well-known/swift-s3-gateway/ready",
+      rawPath: "/.well-known/s3-gateway/ready",
       rawQuery: "",
       headers: [:],
       body: ObjectBodyStream(data: Data())

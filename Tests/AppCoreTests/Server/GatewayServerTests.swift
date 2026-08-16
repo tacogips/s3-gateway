@@ -27,7 +27,7 @@ import Testing
   try await server.start()
   let port = try #require(await server.localPort)
   let url = try #require(
-    URL(string: "http://127.0.0.1:\(port)/.well-known/swift-s3-gateway/ready")
+    URL(string: "http://127.0.0.1:\(port)/.well-known/s3-gateway/ready")
   )
   let (data, response) = try await URLSession.shared.data(from: url)
   #expect((response as? HTTPURLResponse)?.statusCode == 200)

@@ -16,7 +16,7 @@ struct SwiftS3GatewayMain {
         let server = try await GatewayServer.make(configuration: configuration)
         try await server.start()
         if let address = await server.localAddress {
-          print("swift-s3-gateway listening on \(address)")
+          print("s3-gateway listening on \(address)")
         }
         await ShutdownSignal.wait()
         try await server.stop()

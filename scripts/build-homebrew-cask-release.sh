@@ -3,8 +3,8 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-product="swift-s3-gateway"
-artifact_name="swift-s3-gateway"
+product="s3-gateway"
+artifact_name="s3-gateway"
 
 usage() {
   cat <<EOF

@@ -172,7 +172,7 @@ private struct POSIXFaultFixture {
       )
     }
     let staging = sidecar
-      .appendingPathComponent(".swift-s3-gateway-staging", isDirectory: true)
+      .appendingPathComponent(".s3-gateway-staging", isDirectory: true)
       .appendingPathComponent(bucket.rawValue, isDirectory: true)
     if FileManager.default.fileExists(atPath: staging.path) {
       #expect(try FileManager.default.contentsOfDirectory(atPath: staging.path).isEmpty)
@@ -181,7 +181,7 @@ private struct POSIXFaultFixture {
 
   func commitFiles() throws -> [String] {
     let root = sidecar
-      .appendingPathComponent(".swift-s3-gateway-commits", isDirectory: true)
+      .appendingPathComponent(".s3-gateway-commits", isDirectory: true)
     guard FileManager.default.fileExists(atPath: root.path) else { return [] }
     return try FileManager.default.subpathsOfDirectory(atPath: root.path)
       .filter { $0.hasSuffix(".json") }

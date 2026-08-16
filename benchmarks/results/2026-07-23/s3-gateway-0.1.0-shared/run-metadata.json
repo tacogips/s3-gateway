@@ -1,5 +1,5 @@
 {
-  "target": "swift-s3-gateway-0.1.0-shared",
+  "target": "s3-gateway-0.1.0-shared",
   "version": "0.1.0",
   "sourceRevisionOrImageDigest": "7b530acf3221ebee7e565a5494a7182ff47a21e5",
   "storageModel": "direct-local-directory",

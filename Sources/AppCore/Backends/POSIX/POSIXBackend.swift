@@ -326,7 +326,7 @@ public actor POSIXBackend: ObjectStoreBackend {
     try mapper.enumerateRegularFiles(bucket: bucket) { url in
       try Task.checkCancellation()
       guard Date() <= deadline else { throw BackendError.deadlineExceeded }
-      if url.lastPathComponent.hasPrefix(".swift-s3-gateway-") { return }
+      if url.lastPathComponent.hasPrefix(".s3-gateway-") { return }
       guard let key = try mapper.logicalKey(bucket: bucket, fileURL: url) else {
         return
       }

@@ -7,7 +7,7 @@ were answered on 2026-07-23 and are recorded in `design-docs/user-qa/`.
 
 ## Purpose
 
-Turn `swift-s3-gateway` into a server-side Swift service that accepts a defined
+Turn `s3-gateway` into a server-side Swift service that accepts a defined
 subset of the S3 HTTP API and stores objects through one backend selected at
 startup: a local POSIX filesystem (`POSIXBackend`) or an upstream S3-compatible
 service (`S3Backend`). This document defines protocol behavior and architectural

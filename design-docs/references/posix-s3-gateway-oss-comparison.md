@@ -65,7 +65,7 @@ Relevant behavior:
 
 ## Benchmark Scope
 
-At minimum, compare `swift-s3-gateway` with current releases of VersityGW,
+At minimum, compare `s3-gateway` with current releases of VersityGW,
 S3Proxy, and SeaweedFS using recorded versions, identical hardware and local
 filesystem, identical object sets, warm and cold runs, and published command
 lines. Measure:

@@ -51,11 +51,11 @@ public struct AppCommand: Sendable {
 
   public var usage: String {
     """
-    Usage: swift-s3-gateway <command> [options]
+    Usage: s3-gateway <command> [options]
 
-      swift-s3-gateway --help
-      swift-s3-gateway --version
-      swift-s3-gateway serve --config <configuration.json>
+      s3-gateway --help
+      s3-gateway --version
+      s3-gateway serve --config <configuration.json>
     """
   }
 }

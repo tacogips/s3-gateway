@@ -86,7 +86,7 @@ import Testing
   }
   let port = try #require(await transport.localPort)
   let readinessURL = try #require(
-    URL(string: "http://127.0.0.1:\(port)/.well-known/swift-s3-gateway/ready")
+    URL(string: "http://127.0.0.1:\(port)/.well-known/s3-gateway/ready")
   )
   let readinessRequest = Task {
     try await URLSession.shared.data(from: readinessURL)

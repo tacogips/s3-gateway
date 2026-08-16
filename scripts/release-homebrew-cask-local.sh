@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-artifact_name="swift-s3-gateway"
+artifact_name="s3-gateway"
 github_repository="user/repo"
 
 usage() {
@@ -89,7 +89,7 @@ release_notes="Signed, notarized, and stapled macOS DMG archives for the Homebre
 if ! gh release view "$release_tag" --repo "$github_repository" >/dev/null 2>&1; then
   gh release create "$release_tag" \
     --repo "$github_repository" \
-    --title "swift-s3-gateway $release_tag" \
+    --title "s3-gateway $release_tag" \
     --notes "$release_notes"
 fi
 
@@ -101,4 +101,4 @@ printf '\nRendered tap cask: %s\n' "$tap_cask_file"
 printf 'Review, commit, and push the tap change from the tap repository.\n'
 printf 'Then install with:\n'
 printf '  brew tap user/tap\n'
-printf '  brew install --cask swift-s3-gateway\n'
+printf '  brew install --cask s3-gateway\n'

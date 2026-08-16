@@ -19,7 +19,7 @@ struct POSIXPathMapper: Sendable {
     let bucket = try bucketURL(bucket)
     switch policy {
     case .managedPrivateLayout:
-      let root = bucket.appendingPathComponent(".swift-s3-gateway-objects", isDirectory: true)
+      let root = bucket.appendingPathComponent(".s3-gateway-objects", isDirectory: true)
       return managedComponents(key).reduce(root) { partial, component in
         partial.appendingPathComponent(component, isDirectory: false)
       }
@@ -38,7 +38,7 @@ struct POSIXPathMapper: Sendable {
     case .sharedLocalDirectory:
       return ObjectKey(rawValue: relative)
     case .managedPrivateLayout:
-      let marker = ".swift-s3-gateway-objects/"
+      let marker = ".s3-gateway-objects/"
       let components = relative.dropFirst(marker.count).split(separator: "/", omittingEmptySubsequences: false)
       guard relative.hasPrefix(marker),
             !components.isEmpty,
@@ -64,7 +64,7 @@ struct POSIXPathMapper: Sendable {
 
   func commitFileURL(bucket: BucketName, key: ObjectKey) -> URL {
     sidecarURL
-      .appendingPathComponent(".swift-s3-gateway-commits", isDirectory: true)
+      .appendingPathComponent(".s3-gateway-commits", isDirectory: true)
       .appendingPathComponent(bucket.rawValue, isDirectory: true)
       .appendingPathComponent(keyDigest(key) + ".json", isDirectory: false)
   }
@@ -98,7 +98,7 @@ struct POSIXPathMapper: Sendable {
       close(destinationParent)
       throw error
     }
-    let temporaryName = ".swift-s3-gateway-\(UUID().uuidString).tmp"
+    let temporaryName = ".s3-gateway-\(UUID().uuidString).tmp"
     let descriptor = openat(
       temporaryParent,
       temporaryName,
@@ -229,7 +229,7 @@ struct POSIXPathMapper: Sendable {
       let directory = try openStagingDirectory(bucket: bucket)
       defer { close(directory) }
       let url = sidecarURL
-        .appendingPathComponent(".swift-s3-gateway-staging", isDirectory: true)
+        .appendingPathComponent(".s3-gateway-staging", isDirectory: true)
         .appendingPathComponent(bucketText, isDirectory: true)
       let names = try FileManager.default.contentsOfDirectory(atPath: url.path)
       for name in names where Self.isTemporaryName(name) {
@@ -434,7 +434,7 @@ struct POSIXPathMapper: Sendable {
     let bucketComponents = bucketPath.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
     switch policy {
     case .managedPrivateLayout:
-      return bucketComponents + [".swift-s3-gateway-objects"] + managedComponents(key)
+      return bucketComponents + [".s3-gateway-objects"] + managedComponents(key)
     case .sharedLocalDirectory:
       return bucketComponents + (try sharedComponents(key))
     }
@@ -490,7 +490,7 @@ struct POSIXPathMapper: Sendable {
     guard current >= 0 else { throw BackendError.accessDenied }
     do {
       try validateDirectoryDevice(current)
-      for component in [".swift-s3-gateway-staging", bucket.rawValue] {
+      for component in [".s3-gateway-staging", bucket.rawValue] {
         var next = openat(current, component, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
         if next < 0, errno == ENOENT {
           guard mkdirat(current, component, mode_t(0o700)) == 0 || errno == EEXIST else {
@@ -590,7 +590,7 @@ struct POSIXPathMapper: Sendable {
   }
 
   private static func isTemporaryName(_ value: String) -> Bool {
-    let prefix = ".swift-s3-gateway-"
+    let prefix = ".s3-gateway-"
     let suffix = ".tmp"
     guard value.hasPrefix(prefix), value.hasSuffix(suffix) else { return false }
     let start = value.index(value.startIndex, offsetBy: prefix.count)

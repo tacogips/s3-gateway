@@ -85,10 +85,10 @@ deployment is complete.
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-arm64.dmg"
-/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-x64.dmg"
-spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-arm64.dmg"
-spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/swift-s3-gateway-${version}-darwin-x64.dmg"
+/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/s3-gateway-${version}-darwin-arm64.dmg"
+/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/s3-gateway-${version}-darwin-x64.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/s3-gateway-${version}-darwin-arm64.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/s3-gateway-${version}-darwin-x64.dmg"
 ```
 
 Setup is complete when the secrets are present, the matching Developer ID

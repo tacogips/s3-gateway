@@ -267,7 +267,7 @@ public actor S3Backend: ObjectStoreBackend {
     let directory = configuration.stagingDirectory.map { URL(fileURLWithPath: $0, isDirectory: true) }
       ?? FileManager.default.temporaryDirectory
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let url = directory.appendingPathComponent("swift-s3-gateway-\(UUID().uuidString).upload")
+    let url = directory.appendingPathComponent("s3-gateway-\(UUID().uuidString).upload")
     guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
       throw BackendError.capacityExceeded
     }

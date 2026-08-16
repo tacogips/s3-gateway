@@ -7,7 +7,7 @@ command -v curl >/dev/null
 command -v jq >/dev/null
 command -v openssl >/dev/null
 
-gateway_binary=${GATEWAY_BINARY:-.build/debug/swift-s3-gateway}
+gateway_binary=${GATEWAY_BINARY:-.build/debug/s3-gateway}
 gateway_port=${GATEWAY_PORT:-18443}
 maximum_object_bytes=${MAXIMUM_OBJECT_BYTES:-104857600}
 request_timeout_seconds=${REQUEST_TIMEOUT_SECONDS:-30}
@@ -138,8 +138,8 @@ jq -n \
     virtualHostSuffixes: [],
     acceptedSigV4Regions: ["us-east-1"],
     health: {
-      livenessPath: "/.well-known/swift-s3-gateway/live",
-      readinessPath: "/.well-known/swift-s3-gateway/ready"
+      livenessPath: "/.well-known/s3-gateway/live",
+      readinessPath: "/.well-known/s3-gateway/ready"
     },
     telemetry: {enabled: true},
     credentials: {
@@ -174,7 +174,7 @@ jq -n \
   }' >"$configuration"
 
 endpoint="https://localhost:$gateway_port"
-ready_url="$endpoint/.well-known/swift-s3-gateway/ready"
+ready_url="$endpoint/.well-known/s3-gateway/ready"
 start_gateway() {
   "$gateway_binary" serve --config "$configuration" \
     >>"$work_directory/gateway.stdout" \
@@ -251,7 +251,7 @@ listed_key=$(aws "${aws_arguments[@]}" s3api list-objects-v2 \
 if [[ -n ${STAGE1_BENCHMARK_RESULT_DIR:-} ]]; then
   S3_ENDPOINT=$endpoint \
   S3_BUCKET=test-bucket \
-  TARGET_LABEL=swift-s3-gateway-shared \
+  TARGET_LABEL=s3-gateway-shared \
   TARGET_PID=$gateway_pid \
   scripts/benchmark-s3-stage1.sh "$STAGE1_BENCHMARK_RESULT_DIR"
 fi
@@ -270,10 +270,10 @@ if (( crash_recovery_mib > 0 )); then
     --body "$crash_input" \
     >/dev/null 2>&1 &
   upload_pid=$!
-  staging_bucket="$sidecar_directory/.swift-s3-gateway-staging/test-bucket"
+  staging_bucket="$sidecar_directory/.s3-gateway-staging/test-bucket"
   staged_bytes_observed=0
   for _ in {1..4000}; do
-    for staged_file in "$staging_bucket"/.swift-s3-gateway-*.tmp; do
+    for staged_file in "$staging_bucket"/.s3-gateway-*.tmp; do
       if [[ -f "$staged_file" ]] &&
          [[ $(wc -c <"$staged_file") -gt 1048576 ]]; then
         staged_bytes_observed=1
@@ -298,7 +298,7 @@ if (( crash_recovery_mib > 0 )); then
   fi
   upload_pid=
   start_gateway
-  if find "$staging_bucket" -type f -name '.swift-s3-gateway-*.tmp' -print -quit |
+  if find "$staging_bucket" -type f -name '.s3-gateway-*.tmp' -print -quit |
      grep -q .; then
     echo "Startup recovery left an abandoned staging file." >&2
     exit 1

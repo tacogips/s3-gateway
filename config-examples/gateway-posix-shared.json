@@ -3,8 +3,8 @@
     "host": "0.0.0.0",
     "port": 8443,
     "tls": {
-      "certificateChainPath": "/etc/swift-s3-gateway/tls/certificate.pem",
-      "privateKeyPath": "/etc/swift-s3-gateway/tls/private-key.pem"
+      "certificateChainPath": "/etc/s3-gateway/tls/certificate.pem",
+      "privateKeyPath": "/etc/s3-gateway/tls/private-key.pem"
     },
     "developmentPlaintext": false,
     "trustedProxyAddresses": []
@@ -22,16 +22,16 @@
   "virtualHostSuffixes": [],
   "acceptedSigV4Regions": ["us-east-1"],
   "health": {
-    "livenessPath": "/.well-known/swift-s3-gateway/live",
-    "readinessPath": "/.well-known/swift-s3-gateway/ready"
+    "livenessPath": "/.well-known/s3-gateway/live",
+    "readinessPath": "/.well-known/s3-gateway/ready"
   },
   "telemetry": {
     "enabled": true
   },
   "credentials": {
-    "inboundPath": "/etc/swift-s3-gateway/inbound.json",
-    "upstreamPath": "/etc/swift-s3-gateway/upstream.json",
-    "paginationPath": "/etc/swift-s3-gateway/pagination.json"
+    "inboundPath": "/etc/s3-gateway/inbound.json",
+    "upstreamPath": "/etc/s3-gateway/upstream.json",
+    "paginationPath": "/etc/s3-gateway/pagination.json"
   },
   "authorization": [
     {
