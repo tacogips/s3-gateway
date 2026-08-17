@@ -1,5 +1,6 @@
 {
   "files": [
+    ".pre-commit-config.yaml",
     ".agents/skills/apple-notarization-setup/SKILL.md",
     ".agents/skills/homebrew-release/SKILL.md",
     ".agents/skills/ios-ipados-app-deploy/SKILL.md",
