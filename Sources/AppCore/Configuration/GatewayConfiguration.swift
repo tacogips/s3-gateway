@@ -81,6 +81,7 @@ public struct GatewayConfiguration: Codable, Equatable, Sendable {
     let configuredBuckets: Set<String> = switch backend {
     case .posix(let configuration): Set(configuration.bucketDirectories.keys)
     case .s3(let configuration): Set(configuration.bucketMappings.keys)
+    case .samba(let configuration): Set(configuration.bucketDirectories.keys)
     }
     guard authorization.flatMap(\.grants).allSatisfy({ configuredBuckets.contains($0.bucket) }) else {
       throw ConfigurationError.invalid(field: "authorization", reason: "references an unconfigured bucket")
@@ -226,11 +227,13 @@ public struct GatewayLimits: Codable, Equatable, Sendable {
 public enum BackendConfiguration: Codable, Equatable, Sendable {
   case posix(POSIXBackendConfiguration)
   case s3(UpstreamS3Configuration)
+  case samba(SambaBackendConfiguration)
 
   private enum CodingKeys: String, CodingKey {
     case kind
     case posix
     case s3
+    case samba
   }
 
   public init(from decoder: any Decoder) throws {
@@ -238,7 +241,7 @@ public enum BackendConfiguration: Codable, Equatable, Sendable {
     let kind = try container.decode(BackendKind.self, forKey: .kind)
     switch kind {
     case .posix:
-      guard container.contains(.posix), !container.contains(.s3) else {
+      guard container.contains(.posix), !container.contains(.s3), !container.contains(.samba) else {
         throw DecodingError.dataCorruptedError(
           forKey: .kind,
           in: container,
@@ -247,7 +250,7 @@ public enum BackendConfiguration: Codable, Equatable, Sendable {
       }
       self = .posix(try container.decode(POSIXBackendConfiguration.self, forKey: .posix))
     case .s3:
-      guard container.contains(.s3), !container.contains(.posix) else {
+      guard container.contains(.s3), !container.contains(.posix), !container.contains(.samba) else {
         throw DecodingError.dataCorruptedError(
           forKey: .kind,
           in: container,
@@ -255,6 +258,11 @@ public enum BackendConfiguration: Codable, Equatable, Sendable {
         )
       }
       self = .s3(try container.decode(UpstreamS3Configuration.self, forKey: .s3))
+    case .samba:
+      guard container.contains(.samba), !container.contains(.posix), !container.contains(.s3) else {
+        throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "The backend block must contain only its selected configuration.")
+      }
+      self = .samba(try container.decode(SambaBackendConfiguration.self, forKey: .samba))
     }
   }
 
@@ -267,6 +275,9 @@ public enum BackendConfiguration: Codable, Equatable, Sendable {
     case .s3(let configuration):
       try container.encode(BackendKind.s3, forKey: .kind)
       try container.encode(configuration, forKey: .s3)
+    case .samba(let configuration):
+      try container.encode(BackendKind.samba, forKey: .kind)
+      try container.encode(configuration, forKey: .samba)
     }
   }
 
@@ -274,10 +285,60 @@ public enum BackendConfiguration: Codable, Equatable, Sendable {
     switch self {
     case .posix(let configuration): try configuration.validate(fileSystem: fileSystem)
     case .s3(let configuration): try configuration.validate(fileSystem: fileSystem)
+    case .samba(let configuration): try configuration.validate(fileSystem: fileSystem)
     }
   }
 }
 
+public struct SambaBackendConfiguration: Codable, Equatable, Sendable {
+  public let host: String
+  public let port: Int
+  public let share: String
+  public let credentialsPath: String
+  public let bucketDirectories: [String: String]
+  public let timeoutSeconds: Int
+
+  public init(host: String, port: Int = 445, share: String, credentialsPath: String, bucketDirectories: [String: String], timeoutSeconds: Int = 30) {
+    self.host = host
+    self.port = port
+    self.share = share
+    self.credentialsPath = credentialsPath
+    self.bucketDirectories = bucketDirectories
+    self.timeoutSeconds = timeoutSeconds
+  }
+
+  func validate(fileSystem: FileSystemInspecting) throws {
+    guard !host.isEmpty, host.utf8.count <= 253,
+          host.utf8.allSatisfy({
+            (65...90).contains($0) || (97...122).contains($0) ||
+              (48...57).contains($0) || [45, 46, 58, 91, 93, 37].contains($0)
+          }),
+          (1...65_535).contains(port),
+          !share.isEmpty, !share.contains("/"), !share.contains("\\"),
+          credentialsPath.hasPrefix("/"), (1...300).contains(timeoutSeconds),
+          !bucketDirectories.isEmpty,
+          Set(bucketDirectories.values).count == bucketDirectories.count,
+          bucketDirectories.allSatisfy({
+            BucketName(rawValue: $0.key) != nil && !$0.value.hasPrefix("/") &&
+              !$0.value.isEmpty && !$0.value.contains("\\") &&
+              $0.value != ".s3-gateway" && !$0.value.hasPrefix(".s3-gateway/") &&
+              $0.value.split(separator: "/", omittingEmptySubsequences: false)
+                .allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." })
+          }) else {
+      throw ConfigurationError.invalid(field: "backend.samba", reason: "host, share, credential path, timeout, and bucket mappings must be valid")
+    }
+    let mappings = bucketDirectories.values.map { $0.split(separator: "/") }
+    for first in mappings.indices {
+      for second in mappings.indices where first < second {
+        let commonLength = min(mappings[first].count, mappings[second].count)
+        guard Array(mappings[first].prefix(commonLength)) != Array(mappings[second].prefix(commonLength)) else {
+          throw ConfigurationError.invalid(field: "backend.samba.bucketDirectories", reason: "bucket paths must not overlap")
+        }
+      }
+    }
+    try fileSystem.validateCredentialFile(path: credentialsPath)
+  }
+}
 public struct POSIXBackendConfiguration: Codable, Equatable, Sendable {
   public let rootPath: String
   public let bucketDirectories: [String: String]

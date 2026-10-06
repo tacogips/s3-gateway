@@ -1,6 +1,15 @@
 {
-  "originHash" : "3c05d1f61f37184610dcb1979e2caeb442cc72f8c9f6c83dfc3ca5fefae31d8a",
+  "originHash" : "8e83f746f76a05923342d1716094b3bca6c82717dae9558e60af3f88274492d3",
   "pins" : [
+    {
+      "identity" : "pathworks",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RuiNelson/PathWorks.git",
+      "state" : {
+        "revision" : "c165f00ed955e73448d73ac5c4ce7ab57d67f533",
+        "version" : "2.0.1"
+      }
+    },
     {
       "identity" : "swift-asn1",
       "kind" : "remoteSourceControl",
@@ -62,6 +71,15 @@
       "state" : {
         "revision" : "50688cacbd41d547e9eb9f7a213542340b7c442b",
         "version" : "1.7.5"
+      }
+    },
+    {
+      "identity" : "swiftsmb",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RuiNelson/SwiftSMB.git",
+      "state" : {
+        "revision" : "107c0909d8780166a601846608c3f63bcb42cdf9",
+        "version" : "3.3.1"
       }
     }
   ],

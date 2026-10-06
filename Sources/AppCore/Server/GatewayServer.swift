@@ -24,6 +24,8 @@ public actor GatewayServer {
         maximumXMLBytes: configuration.limits.maximumXMLBytes,
         requestTimeoutSeconds: configuration.limits.requestTimeoutSeconds
       )
+    case .samba(let samba):
+      backend = try SambaBackend(configuration: samba, maximumChunkBytes: configuration.limits.maximumChunkBytes)
     }
     try await backend.readinessCheck(
       deadline: Date().addingTimeInterval(

@@ -3,6 +3,7 @@ import Foundation
 public enum BackendKind: String, Codable, CaseIterable, Sendable {
   case posix
   case s3
+  case samba
 }
 
 public enum AddressingStyle: String, Codable, CaseIterable, Sendable {

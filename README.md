@@ -2,7 +2,8 @@
 
 A bounded, SigV4-authenticated S3 gateway written in Swift. It can expose an
 approved local directory tree as S3 objects or forward requests to another S3
-service with a separate upstream credential.
+service with a separate upstream credential. On macOS, it can also connect
+directly to an SMB2/SMB3 share hosted by Samba or another compatible server.
 
 ## Run the gateway
 
@@ -60,6 +61,18 @@ For an upstream S3 backend, HTTPS certificate verification is always enabled.
 Set `backend.s3.trustedCAPath` to an absolute PEM bundle path when the upstream
 uses a private CA; omitting it uses the platform trust roots. Hostname
 verification remains enabled in both cases.
+
+For a Samba backend, start with `config-examples/gateway-samba.json`. The SMB
+credential file must be JSON with mode `0600`, owned by the account running the
+gateway, and contain `{"version":1,"username":"gateway","password":"...","domain":null}`.
+Create it separately from the S3 client credential files. The configured share
+must allow the gateway account to create, read, rename, and delete files in the
+mapped bucket directories. Bucket paths are relative to the SMB share root.
+The backend supports object reads (including byte ranges), writes, deletes,
+listing, content type, user metadata, and SHA-256 checksums. It stores the S3
+metadata in a reserved `.s3-gateway` directory within the share. Keep that path
+reserved for the gateway. SMB does not provide the gateway's conditional-write
+contract, and object replacement has a brief delete/rename gap.
 
 Configured health routes are exact-match, unauthenticated control-plane routes
 that return only fixed state. Readiness uses separate capacity from authenticated

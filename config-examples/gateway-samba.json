@@ -1,0 +1,43 @@
+{
+  "listener": {
+    "host": "127.0.0.1",
+    "port": 8443,
+    "tls": {
+      "certificateChainPath": "/etc/s3-gateway/tls/fullchain.pem",
+      "privateKeyPath": "/etc/s3-gateway/tls/private-key.pem"
+    },
+    "developmentPlaintext": false,
+    "trustedProxyAddresses": []
+  },
+  "limits": {
+    "maximumHeaderBytes": 32768,
+    "maximumXMLBytes": 1048576,
+    "maximumObjectBytes": 5368709120,
+    "maximumChunkBytes": 65536,
+    "maximumInFlightBytes": 8388608,
+    "maximumConcurrentRequests": 256,
+    "requestTimeoutSeconds": 300
+  },
+  "addressingStyles": ["path"],
+  "virtualHostSuffixes": [],
+  "acceptedSigV4Regions": ["us-east-1"],
+  "credentials": {
+    "inboundPath": "/etc/s3-gateway/credentials/inbound.json",
+    "upstreamPath": "/etc/s3-gateway/credentials/upstream.json",
+    "paginationPath": "/etc/s3-gateway/credentials/pagination.json"
+  },
+  "authorization": [],
+  "backend": {
+    "kind": "samba",
+    "samba": {
+      "host": "nas.example.test",
+      "port": 445,
+      "share": "objects",
+      "credentialsPath": "/etc/s3-gateway/credentials/samba.json",
+      "bucketDirectories": {
+        "local-files": "s3-gateway/local-files"
+      },
+      "timeoutSeconds": 30
+    }
+  }
+}
